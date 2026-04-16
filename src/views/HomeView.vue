@@ -293,6 +293,35 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </section>
+
+    <!-- Why section: one row, two columns -->
+    <section class="w-full py-6">
+      <h1 class="text-3xl text-center font-bold mb-[4rem] tracking-tight lg:text-5xl">
+        Why GreenBreeze Exists
+      </h1>
+
+      <div class="mx-auto grid max-w-7xl items-center gap-10 px-6 lg:grid-cols-2 lg:px-10">
+        <!-- Why section: left image -->
+        <div class="overflow-hidden rounded-[10px] border border-slate-200 shadow-sm">
+          <img
+            src="/home-control.jpg"
+            alt="Smart home heating and cooling control interface"
+            class="h-full w-full object-cover"
+          />
+        </div>
+
+        <!-- Why section: right text -->
+        <div>
+          <h3 class="text-xl font-bold lg:text-3xl">
+            Avoid worst peak windows. Keep homes comfortable. Reduce climate impact.
+          </h3>
+          <p class="mt-4 text-[20px]">
+            GreenBreeze helps households make smarter heating and cooling choices during high-risk
+            periods, balancing indoor comfort with lower grid pressure and lower emissions.
+          </p>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
