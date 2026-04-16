@@ -7,19 +7,8 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
 import { Button } from '@/components/ui/button'
-
-// Router state
-const route = useRoute()
-
-// Navbar tabs
-const tabs = [
-  { label: 'Home', to: '/', icon: Home },
-  { label: 'Forecast', to: '/forecast', icon: LineChart },
-  { label: 'Awareness', to: '/awareness', icon: Leaf },
-]
-
-// Active tab helper
-const isActive = computed(() => (to: string) => route.path === to)
+import SiteFooter from '@/components/layout/SiteFooter.vue'
+import SiteHeader from '@/components/layout/SiteHeader.vue'
 
 // Hero lottie refs
 const earthLottieRef = ref<DotLottieVueInstance | null>(null)
@@ -69,38 +58,8 @@ onBeforeUnmount(() => {
 <template>
   <!-- Page wrapper -->
   <div class="min-h-screen bg-white text-slate-900">
-    <!-- Navbar -->
-    <header
-      class="border-b border-emerald-100 bg-white/85 shadow-sm shadow-slate-200/60 backdrop-blur"
-    >
-      <div class="mx-auto flex h-20 max-w-[1400px] items-center justify-between px-6 lg:px-10">
-        <!-- Navbar: brand -->
-        <RouterLink to="/" class="flex items-center gap-3">
-          <img src="/logo.png" alt="GreenBreeze logo" class="h-10 w-10 rounded-md object-contain" />
-          <div>
-            <p class="text-[25px] font-extrabold tracking-tight text-[var(--gb-grid)]">
-              GreenBreeze
-            </p>
-          </div>
-        </RouterLink>
-
-        <!-- Navbar: tabs -->
-        <nav class="flex items-center gap-4">
-          <Button
-            v-for="tab in tabs"
-            :key="tab.to"
-            as-child
-            :variant="isActive(tab.to) ? 'default' : 'outline'"
-            class="rounded-full px-5"
-          >
-            <RouterLink :to="tab.to" class="flex items-center gap-2">
-              <component :is="tab.icon" class="h-4 w-4" />
-              {{ tab.label }}
-            </RouterLink>
-          </Button>
-        </nav>
-      </div>
-    </header>
+    <!-- Shared navbar -->
+    <SiteHeader />
 
     <!-- Hero section -->
     <section class="w-full">
@@ -417,15 +376,8 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <!-- Footer -->
-    <footer class="w-full bg-[var(--gb-grid)] py-8">
-      <div
-        class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-6 text-center text-white lg:flex-row lg:px-10"
-      >
-        <p class="text-white">© 2026 GreenBreeze. Smarter Heating & Cooling for Climate Action.</p>
-        <p class="text-sm text-white/90">Melbourne, Victoria</p>
-      </div>
-    </footer>
+    <!-- Shared footer -->
+    <SiteFooter />
   </div>
 </template>
 
