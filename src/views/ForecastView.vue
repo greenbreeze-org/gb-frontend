@@ -22,19 +22,12 @@ const selectedDevices = ref<string[]>([])
 const locationStatus = ref<'checking' | 'granted' | 'denied' | 'unavailable'>('checking')
 const locationCoords = ref<{ lat: number; lon: number } | null>(null)
 
-// Validation state
-const errors = ref({
-  location: '',
-  houseMaterial: '',
-  devices: '',
-})
-const setupReady = ref(false)
-
 // Weather and heatwave state
 const weatherLoading = ref(false)
 const weatherError = ref('')
 const forecastSnapshot = ref<ForecastSnapshot | null>(null)
 const HEATWAVE_THRESHOLD_C = 35
+const showRecommendations = ref(false)
 
 // Predefined options
 const houseMaterialOptions = [
@@ -64,7 +57,7 @@ const hasValidVicPostcode = computed(() => {
   return (code >= 3000 && code <= 3999) || (code >= 8000 && code <= 8999)
 })
 const hasBrowserLocation = computed(() => Boolean(locationCoords.value))
-const canShowWeatherBlocks = computed(() => {
+const isLocationValid = computed(() => {
   const usingBrowserLocation = locationStatus.value === 'granted' && hasBrowserLocation.value
   const usingPostcode =
     (locationStatus.value === 'denied' || locationStatus.value === 'unavailable') &&
@@ -72,6 +65,43 @@ const canShowWeatherBlocks = computed(() => {
 
   return usingBrowserLocation || usingPostcode
 })
+const isHouseMaterialValid = computed(() => Boolean(houseMaterial.value))
+const isDeviceSelectionValid = computed(() => selectedDevices.value.length > 0)
+const setupReady = computed(
+  () => isLocationValid.value && isHouseMaterialValid.value && isDeviceSelectionValid.value,
+)
+const canShowWeatherBlocks = computed(() => setupReady.value)
+const locationError = computed(() =>
+  isLocationValid.value ? '' : 'Location unavailable. Please enter a valid Victoria postcode.',
+)
+const houseMaterialError = computed(() =>
+  isHouseMaterialValid.value ? '' : 'Please select a house material.',
+)
+const devicesError = computed(() =>
+  isDeviceSelectionValid.value ? '' : 'Please select at least one heating/cooling device.',
+)
+const recommendationCards = [
+  {
+    title: 'Pre-cool / Pre-heat Before Peak',
+    detail:
+      'Use your main system 30-45 minutes before peak demand windows, then reduce intensity during peak hours.',
+  },
+  {
+    title: 'Use Fans First for Comfort',
+    detail:
+      'Run ceiling or portable fans before increasing AC/heater setpoint to cut unnecessary electricity use.',
+  },
+  {
+    title: 'Block Heat Gain in Daytime',
+    detail:
+      'Close blinds/curtains on sunny sides and keep doors closed for rooms not in use to hold indoor comfort.',
+  },
+  {
+    title: 'Shift Heavy Appliance Use',
+    detail:
+      'Move laundry, dishwasher, and other high-load usage away from evening peak periods when possible.',
+  },
+]
 
 // Session storage persistence
 const restoreSetupFromSession = () => {
@@ -175,34 +205,6 @@ const toggleDevice = (value: string, checked: boolean) => {
   selectedDevices.value = selectedDevices.value.filter((item) => item !== value)
 }
 
-// Validation rules
-const validateAndContinue = () => {
-  setupReady.value = false
-  errors.value = {
-    location: '',
-    houseMaterial: '',
-    devices: '',
-  }
-
-  if (!hasBrowserLocation.value && !hasValidVicPostcode.value) {
-    errors.value.location = 'Location unavailable. Please enter a valid Victoria postcode.'
-  }
-
-  if (!houseMaterial.value) {
-    errors.value.houseMaterial = 'Please select a house material.'
-  }
-
-  if (selectedDevices.value.length === 0) {
-    errors.value.devices = 'Please select at least one heating/cooling device.'
-  }
-
-  if (errors.value.location || errors.value.houseMaterial || errors.value.devices) {
-    return
-  }
-
-  setupReady.value = true
-}
-
 const tomorrowDateLabel = computed(() => {
   if (!forecastSnapshot.value?.tomorrowDate) return ''
 
@@ -261,15 +263,9 @@ onMounted(async () => {
 })
 
 watch(
-  [postcode, locationStatus, locationCoords],
+  [postcode, locationStatus, locationCoords, houseMaterial, selectedDevices],
   async () => {
-    const canRefetchByPostcode =
-      (locationStatus.value === 'denied' || locationStatus.value === 'unavailable') &&
-      hasValidVicPostcode.value
-
-    const canRefetchByLocation = locationStatus.value === 'granted' && Boolean(locationCoords.value)
-
-    if (canRefetchByPostcode || canRefetchByLocation) {
+    if (setupReady.value) {
       await loadForecastBlocks()
       return
     }
@@ -277,6 +273,7 @@ watch(
     // Hide blocks and clear stale data until required location/postcode is available.
     forecastSnapshot.value = null
     weatherError.value = ''
+    showRecommendations.value = false
   },
   { deep: true },
 )
@@ -288,16 +285,25 @@ watch(
     <!-- Shared navbar -->
     <SiteHeader />
 
-    <!-- Forecast page shell -->
-    <main class="mx-auto max-w-7xl space-y-8 px-6 py-10 lg:px-10">
-      <!-- Heading -->
-      <section>
-        <h1 class="text-3xl font-bold tracking-tight lg:text-5xl">Forecast Setup</h1>
-        <p class="mt-3 text-[18px]">
-          Set your household context for smarter heating and cooling guidance.
-        </p>
+    <section
+        class="relative flex w-full min-h-[320px] items-center justify-center overflow-hidden px-6 py-10 lg:min-h-[700px] lg:px-10"
+        style="
+          background-image: url('/forecast.jpg');
+          background-size: 100% 100%;
+          background-repeat: no-repeat;
+          background-position: center top;
+        "
+      >
+        <div class="text-center">
+          <h1 class="text-3xl font-bold tracking-tight text-white lg:text-8xl">Forecast</h1>
+          <p class="mt-3 text-[30px] text-white">
+            Set your household context for smarter heating and cooling guidance.
+          </p>
+        </div>
       </section>
 
+    <!-- Forecast page shell -->
+    <main class="mx-auto max-w-7xl space-y-8 px-6 py-10 lg:px-10">
       <!-- User setup form -->
       <section class="rounded-2xl border border-slate-200 p-8 lg:p-10">
         <div class="mx-auto max-w-4xl">
@@ -341,9 +347,7 @@ watch(
                 {{ option.label }}
               </option>
             </select>
-            <p v-if="errors.houseMaterial" class="text-sm text-red-600">
-              {{ errors.houseMaterial }}
-            </p>
+            <p v-if="houseMaterialError" class="text-sm text-red-600">{{ houseMaterialError }}</p>
           </div>
 
           <div
@@ -359,7 +363,7 @@ watch(
               placeholder="e.g. 3000"
               class="h-11 text-base"
             />
-            <p v-if="errors.location" class="text-sm text-red-600">{{ errors.location }}</p>
+            <p v-if="locationError" class="text-sm text-red-600">{{ locationError }}</p>
           </div>
 
           <div class="mt-6 space-y-3">
@@ -378,21 +382,18 @@ watch(
                 <Label :for="device.value" class="text-base">{{ device.label }}</Label>
               </div>
             </div>
-            <p v-if="errors.devices" class="text-sm text-red-600">{{ errors.devices }}</p>
-          </div>
-
-          <div class="mt-6 flex items-center gap-3">
-            <Button class="h-11 px-5 text-base" @click="validateAndContinue"
-              >See Forecast</Button
-            >
+            <p v-if="devicesError" class="text-sm text-red-600">{{ devicesError }}</p>
           </div>
 
           <div
             v-if="setupReady"
             class="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
           >
-            Setup complete. You can now move to forecast recommendations in the next implementation
-            step.
+            Form has been validated.
+          </div>
+
+          <div v-else class="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Form is yet to be validated.
           </div>
         </div>
       </section>
@@ -404,14 +405,19 @@ watch(
           <h3 class="text-2xl font-bold">Weather Forecast</h3>
           <p class="mt-2 text-[16px]">Current and day-ahead temperature view for planning.</p>
 
-          <div v-if="weatherLoading" class="mt-5 text-sm text-slate-600">Loading weather data...</div>
+          <div v-if="weatherLoading" class="mt-5 text-sm text-slate-600">
+            Loading weather data...
+          </div>
 
           <div v-else-if="forecastSnapshot" class="mt-5 space-y-3">
             <p class="text-sm font-semibold text-slate-600">{{ forecastSnapshot.locationLabel }}</p>
             <p class="text-2xl font-bold">
               Current: {{ forecastSnapshot.currentTempC.toFixed(1) }}°C
             </p>
-            <p class="text-[17px]">Today: {{ forecastSnapshot.todayMinC.toFixed(1) }}°C - {{ forecastSnapshot.todayMaxC.toFixed(1) }}°C</p>
+            <p class="text-[17px]">
+              Today: {{ forecastSnapshot.todayMinC.toFixed(1) }}°C -
+              {{ forecastSnapshot.todayMaxC.toFixed(1) }}°C
+            </p>
             <p class="text-[17px]">
               Tomorrow max: {{ forecastSnapshot.tomorrowMaxC.toFixed(1) }}°C
               <span class="text-slate-500">({{ tomorrowDateLabel }})</span>
@@ -426,7 +432,10 @@ watch(
           <h3 class="text-2xl font-bold">Heatwave Alert</h3>
           <p class="mt-2 text-[16px]">Advance warning based on tomorrow's forecast maximum.</p>
 
-          <div v-if="weatherLoading" class="mt-5 rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-700">
+          <div
+            v-if="weatherLoading"
+            class="mt-5 rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-700"
+          >
             Checking forecast for heatwave conditions...
           </div>
 
@@ -434,8 +443,9 @@ watch(
             v-else-if="forecastSnapshot && isHeatwaveTomorrow"
             class="mt-5 rounded-xl bg-red-100 px-4 py-3 text-[15px] text-red-800"
           >
-            Heatwave expected on {{ tomorrowDateLabel }} ({{ forecastSnapshot.tomorrowMaxC.toFixed(1) }}°C).
-            Prepare your home today.
+            Heatwave expected on {{ tomorrowDateLabel }} ({{
+              forecastSnapshot.tomorrowMaxC.toFixed(1)
+            }}°C). Prepare your home today.
           </div>
 
           <div
@@ -449,7 +459,9 @@ watch(
           <p v-else-if="weatherError" class="mt-5 text-sm text-red-600">{{ weatherError }}</p>
 
           <div class="mt-5">
-            <Button class="electric h-10 px-4 text-sm">See Recommendations</Button>
+            <Button class="electric h-10 px-4 text-sm" @click="showRecommendations = true"
+              >See Recommendations</Button
+            >
           </div>
         </article>
       </section>
@@ -459,9 +471,24 @@ watch(
         class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-slate-700"
       >
         <p class="text-base">
-          Weather and heatwave insights will appear after location is granted or a valid 4-digit
-          postcode is entered.
+          Weather and heatwave insights will appear once the form is fully validated.
         </p>
+      </section>
+
+      <!-- Recommendations block -->
+      <section v-if="showRecommendations" class="rounded-2xl border border-slate-200 p-6 lg:p-7">
+        <h3 class="text-2xl font-bold">Cooling & Heating Recommendations</h3>
+
+        <div class="mt-5 grid gap-4 md:grid-cols-2">
+          <article
+            v-for="item in recommendationCards"
+            :key="item.title"
+            class="rounded-xl border border-slate-200 bg-slate-50 p-4"
+          >
+            <h4 class="text-lg font-semibold text-emerald-800">{{ item.title }}</h4>
+            <p class="mt-2 text-sm text-slate-700">{{ item.detail }}</p>
+          </article>
+        </div>
       </section>
     </main>
 
