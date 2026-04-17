@@ -90,7 +90,7 @@ const emissionsInsight = computed(() => {
 
      <!-- Hero -->
     <section
-      class="relative flex w-full min-h-[320px] items-center justify-center overflow-hidden px-6 py-10 lg:min-h-[600px] lg:px-10"
+      class="relative flex w-full min-h-[320px] items-center justify-center overflow-hidden px-6 py-10 lg:h-[600px] lg:px-10"
       style="
         background-image: url('/awarness.jpg');
         background-size: 100% 100%;

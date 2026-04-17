@@ -286,7 +286,7 @@ watch(
     <SiteHeader />
 
     <section
-        class="relative flex w-full min-h-[320px] items-center justify-center overflow-hidden px-6 py-10 lg:min-h-[700px] lg:px-10"
+        class="relative flex w-full min-h-[320px] items-center justify-center overflow-hidden px-6 py-10 lg:h-[600px] lg:px-10"
         style="
           background-image: url('/forecast.jpg');
           background-size: 100% 100%;
@@ -305,9 +305,9 @@ watch(
     <!-- Forecast page shell -->
     <main class="mx-auto max-w-7xl space-y-8 px-6 py-10 lg:px-10">
       <!-- User setup form -->
-      <section class="rounded-2xl border border-slate-200 p-8 lg:p-10">
+      <section class="ml-[100px] max-w-5xl rounded-2xl border border-slate-200 p-8 lg:p-10">
         <div class="mx-auto max-w-4xl">
-          <div class="flex flex-wrap items-center gap-3">
+          <div class="flex flex-wrap items-center gap-3 justify-center mb-[40px]">
             <h2 class="text-3xl font-bold">User Setup</h2>
             <span
               v-if="locationStatus === 'granted'"
@@ -329,7 +329,9 @@ watch(
             </span>
           </div>
 
-          <div class="mt-6 space-y-2">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div class="mt-6 space-y-2">
             <Label for="house-material" class="text-base font-semibold"
               >House Material (Detached House)</Label
             >
@@ -365,6 +367,9 @@ watch(
             />
             <p v-if="locationError" class="text-sm text-red-600">{{ locationError }}</p>
           </div>
+          </div>
+
+          
 
           <div class="mt-6 space-y-3">
             <Label class="text-base font-semibold">Available Heating/Cooling Devices</Label>
@@ -468,7 +473,7 @@ watch(
 
       <section
         v-else
-        class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-slate-700"
+        class="rounded-2xl max-w-5xl ml-[100px] border border-dashed border-slate-300 bg-slate-50 p-6 text-slate-700"
       >
         <p class="text-base">
           Weather and heatwave insights will appear once the form is fully validated.
