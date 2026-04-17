@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { fetchForecastSnapshot, type ForecastSnapshot } from '@/services/forecast'
 
 // Storage key (session only: survives refresh, resets on new tab)
 const STORAGE_KEY = 'forecast_setup_v2'
@@ -29,6 +30,12 @@ const errors = ref({
 })
 const setupReady = ref(false)
 
+// Weather and heatwave state
+const weatherLoading = ref(false)
+const weatherError = ref('')
+const forecastSnapshot = ref<ForecastSnapshot | null>(null)
+const HEATWAVE_THRESHOLD_C = 35
+
 // Predefined options
 const houseMaterialOptions = [
   { value: 'brick-veneer', label: 'Brick Veneer' },
@@ -49,8 +56,22 @@ const deviceOptions = [
 ]
 
 // Helpers
-const hasValidPostcode = computed(() => /^\d{4}$/.test(postcode.value.trim()))
+const hasValidVicPostcode = computed(() => {
+  const code = Number(postcode.value.trim())
+  if (Number.isNaN(code)) return false
+
+  // Victoria postcodes are generally 3000-3999 and 8000-8999.
+  return (code >= 3000 && code <= 3999) || (code >= 8000 && code <= 8999)
+})
 const hasBrowserLocation = computed(() => Boolean(locationCoords.value))
+const canShowWeatherBlocks = computed(() => {
+  const usingBrowserLocation = locationStatus.value === 'granted' && hasBrowserLocation.value
+  const usingPostcode =
+    (locationStatus.value === 'denied' || locationStatus.value === 'unavailable') &&
+    hasValidVicPostcode.value
+
+  return usingBrowserLocation || usingPostcode
+})
 
 // Session storage persistence
 const restoreSetupFromSession = () => {
@@ -163,8 +184,8 @@ const validateAndContinue = () => {
     devices: '',
   }
 
-  if (!hasBrowserLocation.value && !hasValidPostcode.value) {
-    errors.value.location = 'Location unavailable. Please enter a valid 4-digit postcode.'
+  if (!hasBrowserLocation.value && !hasValidVicPostcode.value) {
+    errors.value.location = 'Location unavailable. Please enter a valid Victoria postcode.'
   }
 
   if (!houseMaterial.value) {
@@ -182,11 +203,83 @@ const validateAndContinue = () => {
   setupReady.value = true
 }
 
+const tomorrowDateLabel = computed(() => {
+  if (!forecastSnapshot.value?.tomorrowDate) return ''
+
+  const date = new Date(forecastSnapshot.value.tomorrowDate)
+  if (Number.isNaN(date.getTime())) return forecastSnapshot.value.tomorrowDate
+
+  return date.toLocaleDateString('en-AU', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+})
+
+const isHeatwaveTomorrow = computed(
+  () => (forecastSnapshot.value?.tomorrowMaxC ?? 0) >= HEATWAVE_THRESHOLD_C,
+)
+
+const loadForecastBlocks = async () => {
+  if (!canShowWeatherBlocks.value) {
+    forecastSnapshot.value = null
+    weatherError.value = ''
+    weatherLoading.value = false
+    return
+  }
+
+  weatherLoading.value = true
+  weatherError.value = ''
+
+  try {
+    const postcodeValue =
+      locationStatus.value === 'denied' || locationStatus.value === 'unavailable'
+        ? postcode.value.trim()
+        : undefined
+
+    const snapshot = await fetchForecastSnapshot({
+      lat: locationCoords.value?.lat,
+      lon: locationCoords.value?.lon,
+      postcode: postcodeValue && hasValidVicPostcode.value ? postcodeValue : undefined,
+    })
+
+    forecastSnapshot.value = snapshot
+  } catch {
+    weatherError.value = 'Unable to load weather right now. Please try again.'
+  } finally {
+    weatherLoading.value = false
+  }
+}
+
 // Lifecycle
 onMounted(async () => {
   restoreSetupFromSession()
   await checkBrowserLocationPermission()
+  if (canShowWeatherBlocks.value) {
+    await loadForecastBlocks()
+  }
 })
+
+watch(
+  [postcode, locationStatus, locationCoords],
+  async () => {
+    const canRefetchByPostcode =
+      (locationStatus.value === 'denied' || locationStatus.value === 'unavailable') &&
+      hasValidVicPostcode.value
+
+    const canRefetchByLocation = locationStatus.value === 'granted' && Boolean(locationCoords.value)
+
+    if (canRefetchByPostcode || canRefetchByLocation) {
+      await loadForecastBlocks()
+      return
+    }
+
+    // Hide blocks and clear stale data until required location/postcode is available.
+    forecastSnapshot.value = null
+    weatherError.value = ''
+  },
+  { deep: true },
+)
 </script>
 
 <template>
@@ -258,7 +351,7 @@ onMounted(async () => {
             class="mt-6 space-y-2"
           >
             <Label for="postcode" class="text-base font-semibold"
-              >Postcode (required when location is denied)</Label
+              >Postcode (VIC only, required when location is denied)</Label
             >
             <Input
               id="postcode"
@@ -290,11 +383,8 @@ onMounted(async () => {
 
           <div class="mt-6 flex items-center gap-3">
             <Button class="h-11 px-5 text-base" @click="validateAndContinue"
-              >See Recommendations</Button
+              >See Forecast</Button
             >
-            <p class="text-base text-slate-600">
-              Validates required setup fields for this iteration.
-            </p>
           </div>
 
           <div
@@ -305,6 +395,73 @@ onMounted(async () => {
             step.
           </div>
         </div>
+      </section>
+
+      <!-- Weather + Heatwave row -->
+      <section v-if="canShowWeatherBlocks" class="grid gap-6 lg:grid-cols-2">
+        <!-- Weather block -->
+        <article class="rounded-2xl border border-slate-200 p-6 lg:p-7">
+          <h3 class="text-2xl font-bold">Weather Forecast</h3>
+          <p class="mt-2 text-[16px]">Current and day-ahead temperature view for planning.</p>
+
+          <div v-if="weatherLoading" class="mt-5 text-sm text-slate-600">Loading weather data...</div>
+
+          <div v-else-if="forecastSnapshot" class="mt-5 space-y-3">
+            <p class="text-sm font-semibold text-slate-600">{{ forecastSnapshot.locationLabel }}</p>
+            <p class="text-2xl font-bold">
+              Current: {{ forecastSnapshot.currentTempC.toFixed(1) }}°C
+            </p>
+            <p class="text-[17px]">Today: {{ forecastSnapshot.todayMinC.toFixed(1) }}°C - {{ forecastSnapshot.todayMaxC.toFixed(1) }}°C</p>
+            <p class="text-[17px]">
+              Tomorrow max: {{ forecastSnapshot.tomorrowMaxC.toFixed(1) }}°C
+              <span class="text-slate-500">({{ tomorrowDateLabel }})</span>
+            </p>
+          </div>
+
+          <p v-else-if="weatherError" class="mt-5 text-sm text-red-600">{{ weatherError }}</p>
+        </article>
+
+        <!-- Heatwave alert block -->
+        <article class="rounded-2xl border border-slate-200 p-6 lg:p-7">
+          <h3 class="text-2xl font-bold">Heatwave Alert</h3>
+          <p class="mt-2 text-[16px]">Advance warning based on tomorrow's forecast maximum.</p>
+
+          <div v-if="weatherLoading" class="mt-5 rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-700">
+            Checking forecast for heatwave conditions...
+          </div>
+
+          <div
+            v-else-if="forecastSnapshot && isHeatwaveTomorrow"
+            class="mt-5 rounded-xl bg-red-100 px-4 py-3 text-[15px] text-red-800"
+          >
+            Heatwave expected on {{ tomorrowDateLabel }} ({{ forecastSnapshot.tomorrowMaxC.toFixed(1) }}°C).
+            Prepare your home today.
+          </div>
+
+          <div
+            v-else-if="forecastSnapshot"
+            class="mt-5 rounded-xl bg-emerald-100 px-4 py-3 text-[15px] text-emerald-800"
+          >
+            No heatwave alert for {{ tomorrowDateLabel }}. Forecast max is
+            {{ forecastSnapshot.tomorrowMaxC.toFixed(1) }}°C.
+          </div>
+
+          <p v-else-if="weatherError" class="mt-5 text-sm text-red-600">{{ weatherError }}</p>
+
+          <div class="mt-5">
+            <Button class="electric h-10 px-4 text-sm">See Recommendations</Button>
+          </div>
+        </article>
+      </section>
+
+      <section
+        v-else
+        class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-slate-700"
+      >
+        <p class="text-base">
+          Weather and heatwave insights will appear after location is granted or a valid 4-digit
+          postcode is entered.
+        </p>
       </section>
     </main>
 
