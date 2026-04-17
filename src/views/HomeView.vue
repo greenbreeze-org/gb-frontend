@@ -171,9 +171,9 @@ onBeforeUnmount(() => {
           <!-- Story row 1: text left, animation right -->
           <article class="grid items-center gap-8 md:grid-cols-2">
             <div>
-              <h3 class="mt-2 text-2xl font-bold lg:text-4xl">Peak-Time Cooling Usage Rises</h3>
+              <h3 class="mt-2 text-2xl font-bold lg:text-4xl">Peak-Time Appliance Usage Rises</h3>
               <p class="mt-3 text-[20px]">
-                Households run cooling appliances heavily during the hottest hours, especially in
+                Households run appliances heavily during the hottest or coolest hours, especially in
                 thermally inefficient homes.
               </p>
             </div>
