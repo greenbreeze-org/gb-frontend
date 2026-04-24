@@ -27,7 +27,6 @@ const weatherLoading = ref(false)
 const weatherError = ref('')
 const forecastSnapshot = ref<ForecastSnapshot | null>(null)
 const HEATWAVE_THRESHOLD_C = 35
-const showRecommendations = ref(false)
 
 // Predefined options
 const houseMaterialOptions = [
@@ -80,28 +79,6 @@ const houseMaterialError = computed(() =>
 const devicesError = computed(() =>
   isDeviceSelectionValid.value ? '' : 'Please select at least one heating/cooling device.',
 )
-const recommendationCards = [
-  {
-    title: 'Pre-cool / Pre-heat Before Peak',
-    detail:
-      'Use your main system 30-45 minutes before peak demand windows, then reduce intensity during peak hours.',
-  },
-  {
-    title: 'Use Fans First for Comfort',
-    detail:
-      'Run ceiling or portable fans before increasing AC/heater setpoint to cut unnecessary electricity use.',
-  },
-  {
-    title: 'Block Heat Gain in Daytime',
-    detail:
-      'Close blinds/curtains on sunny sides and keep doors closed for rooms not in use to hold indoor comfort.',
-  },
-  {
-    title: 'Shift Heavy Appliance Use',
-    detail:
-      'Move laundry, dishwasher, and other high-load usage away from evening peak periods when possible.',
-  },
-]
 
 // Session storage persistence
 const restoreSetupFromSession = () => {
@@ -273,7 +250,6 @@ watch(
     // Hide blocks and clear stale data until required location/postcode is available.
     forecastSnapshot.value = null
     weatherError.value = ''
-    showRecommendations.value = false
   },
   { deep: true },
 )
@@ -462,12 +438,6 @@ watch(
           </div>
 
           <p v-else-if="weatherError" class="mt-5 text-sm text-red-600">{{ weatherError }}</p>
-
-          <div class="mt-5">
-            <Button class="electric h-10 px-4 text-sm" @click="showRecommendations = true"
-              >See Recommendations</Button
-            >
-          </div>
         </article>
       </section>
 
@@ -478,22 +448,6 @@ watch(
         <p class="text-base">
           Weather and heatwave insights will appear once the form is fully validated.
         </p>
-      </section>
-
-      <!-- Recommendations block -->
-      <section v-if="showRecommendations" class="rounded-2xl border border-slate-200 p-6 lg:p-7">
-        <h3 class="text-2xl font-bold">Cooling & Heating Recommendations</h3>
-
-        <div class="mt-5 grid gap-4 md:grid-cols-2">
-          <article
-            v-for="item in recommendationCards"
-            :key="item.title"
-            class="rounded-xl border border-slate-200 bg-slate-50 p-4"
-          >
-            <h4 class="text-lg font-semibold text-emerald-800">{{ item.title }}</h4>
-            <p class="mt-2 text-sm text-slate-700">{{ item.detail }}</p>
-          </article>
-        </div>
       </section>
     </main>
 
