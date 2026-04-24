@@ -34,6 +34,11 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Add iteration1 snapshot
+        run: |
+          mkdir -p dist/iteration1
+          cp -R iteration1/* dist/iteration1/
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
