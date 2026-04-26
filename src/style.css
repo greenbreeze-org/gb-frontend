@@ -133,13 +133,8 @@
     @apply bg-background text-foreground;
     font-family: 'Manrope', sans-serif;
   }
-  h1 {
+  h1,h2,h3 {
     color: var(--gb-grid);
-  }
-
-  h2,
-  h3 {
-    color: var(--gb-electric);
   }
 
   h1,
@@ -150,4 +145,8 @@
   h6 {
     font-family: 'Sora', sans-serif;
   }
+
+  p {
+  color: #9ca3af;
+}
 }
