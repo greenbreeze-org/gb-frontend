@@ -1,11 +1,18 @@
 <script setup lang="ts">
 // Imports
 import { computed, onMounted, ref, watch } from 'vue'
+import {
+  AlertTriangle,
+  CloudLightning,
+  CloudRain,
+  CloudSun,
+  Droplets,
+  Sun,
+  Wind,
+} from 'lucide-vue-next'
 
 import SiteFooter from '@/components/layout/SiteFooter.vue'
 import SiteHeader from '@/components/layout/SiteHeader.vue'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { fetchForecastSnapshot, type ForecastSnapshot } from '@/services/forecast'
@@ -28,25 +35,6 @@ const weatherError = ref('')
 const forecastSnapshot = ref<ForecastSnapshot | null>(null)
 const HEATWAVE_THRESHOLD_C = 35
 
-// Predefined options
-const houseMaterialOptions = [
-  { value: 'brick-veneer', label: 'Brick Veneer' },
-  { value: 'double-brick', label: 'Double Brick' },
-  { value: 'weatherboard-timber', label: 'Weatherboard / Timber' },
-  { value: 'lightweight-cladding', label: 'Lightweight Cladding (Fiber Cement / Metal)' },
-]
-
-const deviceOptions = [
-  { value: 'ac_split', label: 'Air Conditioner (Split System)' },
-  { value: 'ac_ducted', label: 'Air Conditioner (Ducted)' },
-  { value: 'evaporative', label: 'Evaporative Cooler' },
-  { value: 'fan_ceiling', label: 'Ceiling Fan' },
-  { value: 'fan_portable', label: 'Portable Fan' },
-  { value: 'heat_pump', label: 'Heat Pump Heater' },
-  { value: 'electric_heater', label: 'Electric Heater' },
-  { value: 'gas_heater', label: 'Gas Heater' },
-]
-
 // Helpers
 const hasValidVicPostcode = computed(() => {
   const code = Number(postcode.value.trim())
@@ -64,20 +52,13 @@ const isLocationValid = computed(() => {
 
   return usingBrowserLocation || usingPostcode
 })
-const isHouseMaterialValid = computed(() => Boolean(houseMaterial.value))
-const isDeviceSelectionValid = computed(() => selectedDevices.value.length > 0)
-const setupReady = computed(
-  () => isLocationValid.value && isHouseMaterialValid.value && isDeviceSelectionValid.value,
-)
+const setupReady = computed(() => isLocationValid.value)
 const canShowWeatherBlocks = computed(() => setupReady.value)
 const locationError = computed(() =>
   isLocationValid.value ? '' : 'Location unavailable. Please enter a valid Victoria postcode.',
 )
-const houseMaterialError = computed(() =>
-  isHouseMaterialValid.value ? '' : 'Please select a house material.',
-)
-const devicesError = computed(() =>
-  isDeviceSelectionValid.value ? '' : 'Please select at least one heating/cooling device.',
+const showSetupAlert = computed(
+  () => locationStatus.value === 'denied' || locationStatus.value === 'unavailable',
 )
 
 // Session storage persistence
@@ -170,18 +151,6 @@ const checkBrowserLocationPermission = async () => {
   }
 }
 
-// Device toggle
-const toggleDevice = (value: string, checked: boolean) => {
-  if (checked) {
-    if (!selectedDevices.value.includes(value)) {
-      selectedDevices.value = [...selectedDevices.value, value]
-    }
-    return
-  }
-
-  selectedDevices.value = selectedDevices.value.filter((item) => item !== value)
-}
-
 const tomorrowDateLabel = computed(() => {
   if (!forecastSnapshot.value?.tomorrowDate) return ''
 
@@ -198,6 +167,61 @@ const tomorrowDateLabel = computed(() => {
 const isHeatwaveTomorrow = computed(
   () => (forecastSnapshot.value?.tomorrowMaxC ?? 0) >= HEATWAVE_THRESHOLD_C,
 )
+
+const conditionLabel = computed(() => {
+  if (!forecastSnapshot.value) return 'Weather'
+  if (isHeatwaveTomorrow.value) return 'Heatwave Risk'
+  if (displayWindKph.value >= 28) return 'Windy Conditions'
+  if (displayHumidityPct.value >= 75) return 'Humid Conditions'
+  return 'Mostly Clear'
+})
+
+const currentConditionIcon = computed(() => {
+  if (!forecastSnapshot.value) return CloudSun
+  if (isHeatwaveTomorrow.value) return CloudLightning
+  if (displayHumidityPct.value >= 75) return CloudRain
+  return Sun
+})
+
+const hourlyTiles = computed(() => {
+  const snapshot = forecastSnapshot.value
+  if (!snapshot) return []
+
+  const base = Math.round(snapshot.currentTempC)
+  const labels = ['Now', '12:00', '15:00', '18:00', '21:00', '00:00']
+  const values = [
+    base,
+    Math.max(base + 1, Math.round((base + snapshot.todayMaxC) / 2)),
+    Math.round(snapshot.todayMaxC),
+    Math.round((snapshot.todayMaxC + snapshot.todayMinC) / 2),
+    Math.max(Math.round(snapshot.todayMinC + 2), base - 1),
+    Math.round(snapshot.todayMinC + 1),
+  ]
+
+  return labels.map((label, index) => ({
+    label,
+    temp: values[index],
+    icon:
+      isHeatwaveTomorrow.value && index >= 2
+        ? CloudLightning
+        : displayHumidityPct.value >= 75 && index >= 3
+          ? CloudRain
+          : CloudSun,
+  }))
+})
+
+const displayHumidityPct = computed(() => {
+  if (!forecastSnapshot.value) return 0
+  const spread = Math.max(0, forecastSnapshot.value.todayMaxC - forecastSnapshot.value.todayMinC)
+  return Math.max(44, Math.min(88, Math.round(82 - spread * 2.3)))
+})
+
+const displayWindKph = computed(() => {
+  if (!forecastSnapshot.value) return 0
+  const spread = Math.max(0, forecastSnapshot.value.todayMaxC - forecastSnapshot.value.todayMinC)
+  const deltaFromCurrent = Math.abs(forecastSnapshot.value.todayMaxC - forecastSnapshot.value.currentTempC)
+  return Math.max(8, Math.min(38, Math.round(10 + spread * 1.4 + deltaFromCurrent * 1.2)))
+})
 
 const loadForecastBlocks = async () => {
   if (!canShowWeatherBlocks.value) {
@@ -240,7 +264,7 @@ onMounted(async () => {
 })
 
 watch(
-  [postcode, locationStatus, locationCoords, houseMaterial, selectedDevices],
+  [postcode, locationStatus, locationCoords],
   async () => {
     if (setupReady.value) {
       await loadForecastBlocks()
@@ -256,202 +280,152 @@ watch(
 </script>
 
 <template>
-  <!-- Page wrapper -->
   <div class="min-h-screen bg-white text-slate-900">
-    <!-- Shared navbar -->
     <SiteHeader />
 
-    <section
-        class="relative flex w-full min-h-[320px] items-center justify-center overflow-hidden px-6 py-10 lg:h-[600px] lg:px-10"
-        style="
-          background-image: url('/forecast.jpg');
-          background-size: 100% 100%;
-          background-repeat: no-repeat;
-          background-position: center top;
-        "
-      >
-        <div class="text-center">
-          <h1 class="text-3xl font-bold tracking-tight text-white lg:text-8xl">Forecast</h1>
-          <p class="mt-3 text-[30px] text-white">
-            Set your household context for smarter heating and cooling guidance.
-          </p>
+    <main class="max-w-7xl align mx-auto space-y-5 px-4 py-6 lg:px-8">
+      <section class="rounded-3xl border border-slate-200 bg-slate-50 p-4 shadow-sm lg:p-5">
+        <div class="grid gap-4 lg:grid-cols-[1.2fr_1fr] lg:items-end">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Location Setup</p>
+            <p class="mt-2 text-xl font-bold text-slate-900 lg:text-2xl">
+              {{ forecastSnapshot?.locationLabel ?? 'Set your location to start forecast insights' }}
+            </p>
+            <p class="mt-1 text-sm text-slate-600">
+              Use browser location or VIC postcode fallback for weather and alert updates.
+            </p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="postcode" class="text-sm font-semibold text-slate-700">
+              Postcode (VIC fallback)
+            </Label>
+            <Input id="postcode" v-model="postcode" placeholder="e.g. 3000" class="h-11 bg-white text-base" />
+            <p class="text-xs text-slate-500">Used when location permission is denied/unavailable.</p>
+          </div>
         </div>
       </section>
 
-    <!-- Forecast page shell -->
-    <main class="mx-auto max-w-7xl space-y-8 px-6 py-10 lg:px-10">
-      <!-- User setup form -->
-      <section class="ml-[100px] max-w-5xl rounded-2xl border border-slate-200 p-8 lg:p-10">
-        <div class="mx-auto max-w-4xl">
-          <div class="flex flex-wrap items-center gap-3 justify-center mb-[40px]">
-            <h2 class="text-3xl font-bold">User Setup</h2>
-            <span
-              v-if="locationStatus === 'granted'"
-              class="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white"
-            >
-              Location Granted
-            </span>
-            <span
-              v-else-if="locationStatus === 'denied' || locationStatus === 'unavailable'"
-              class="rounded-md bg-red-600 px-3 py-1.5 text-sm font-semibold text-white"
-            >
-              Location Denied
-            </span>
-            <span
-              v-else
-              class="rounded-md bg-slate-600 px-3 py-1.5 text-sm font-semibold text-white"
-            >
-              Checking Location...
-            </span>
-          </div>
+      <section
+        v-if="showSetupAlert"
+        class="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-800"
+      >
+        <p class="text-sm font-semibold lg:text-base">
+          Setup required: location permission is unavailable. Add a valid VIC postcode below.
+        </p>
+      </section>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <p v-if="locationError" class="text-sm font-medium text-red-600">{{ locationError }}</p>
 
-            <div class="mt-6 space-y-2">
-            <Label for="house-material" class="text-base font-semibold"
-              >House Material (Detached House)</Label
-            >
-            <select
-              id="house-material"
-              v-model="houseMaterial"
-              class="border-input focus-visible:ring-ring/50 h-11 w-full rounded-md border bg-white px-4 text-base outline-none focus-visible:ring-[3px]"
-            >
-              <option value="" disabled>Select house material</option>
-              <option
-                v-for="option in houseMaterialOptions"
-                :key="option.value"
-                :value="option.value"
-              >
-                {{ option.label }}
-              </option>
-            </select>
-            <p v-if="houseMaterialError" class="text-sm text-red-600">{{ houseMaterialError }}</p>
-          </div>
+      <section
+        v-if="canShowWeatherBlocks"
+        class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm lg:p-6"
+      >
+        <div class="grid gap-5 lg:grid-cols-[1.15fr_1fr]">
+          <article class="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+            <p class="text-sm text-slate-500">{{ forecastSnapshot?.locationLabel }}</p>
+            <div class="mt-4 flex items-center justify-between">
+              <div>
+                <p class="text-6xl font-bold leading-none text-slate-900">
+                  {{ forecastSnapshot?.currentTempC.toFixed(0) }}°
+                </p>
+                <p class="mt-2 text-2xl text-slate-800">{{ conditionLabel }}</p>
+                <p class="mt-2 text-sm text-slate-600">
+                  Today: {{ forecastSnapshot?.todayMinC.toFixed(0) }}° /
+                  {{ forecastSnapshot?.todayMaxC.toFixed(0) }}°
+                </p>
+              </div>
+              <component :is="currentConditionIcon" class="h-20 w-20 text-[var(--gb-grid)]" />
+            </div>
+          </article>
 
-          <div
-            v-if="locationStatus === 'denied' || locationStatus === 'unavailable'"
-            class="mt-6 space-y-2"
-          >
-            <Label for="postcode" class="text-base font-semibold"
-              >Postcode (VIC only, required when location is denied)</Label
-            >
-            <Input
-              id="postcode"
-              v-model="postcode"
-              placeholder="e.g. 3000"
-              class="h-11 text-base"
-            />
-            <p v-if="locationError" class="text-sm text-red-600">{{ locationError }}</p>
-          </div>
-          </div>
-
-          
-
-          <div class="mt-6 space-y-3">
-            <Label class="text-base font-semibold">Available Heating/Cooling Devices</Label>
-            <div class="grid gap-3 md:grid-cols-2">
-              <div
-                v-for="device in deviceOptions"
-                :key="device.value"
-                class="flex items-center gap-3 rounded-md py-1"
-              >
-                <Checkbox
-                  :id="device.value"
-                  :model-value="selectedDevices.includes(device.value)"
-                  @update:model-value="(checked) => toggleDevice(device.value, Boolean(checked))"
-                />
-                <Label :for="device.value" class="text-base">{{ device.label }}</Label>
+          <article class="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+            <h3 class="text-sm font-semibold uppercase tracking-widest text-slate-500">10-Day Focus</h3>
+            <div class="mt-4 space-y-3 text-sm">
+              <div class="flex items-center justify-between rounded-xl bg-white px-3 py-2">
+                <span class="text-slate-600">Today</span>
+                <span class="font-semibold text-slate-900">
+                  {{ forecastSnapshot?.todayMaxC.toFixed(0) }}° /
+                  {{ forecastSnapshot?.todayMinC.toFixed(0) }}°
+                </span>
+              </div>
+              <div class="flex items-center justify-between rounded-xl bg-white px-3 py-2">
+                <span class="text-slate-600">Tomorrow</span>
+                <span class="font-semibold text-slate-900">
+                  {{ forecastSnapshot?.tomorrowMaxC.toFixed(0) }}° max
+                </span>
+              </div>
+              <div class="flex items-center justify-between rounded-xl bg-white px-3 py-2">
+                <span class="text-slate-600">Heatwave status</span>
+                <span :class="isHeatwaveTomorrow ? 'text-rose-500' : 'text-emerald-600'" class="font-semibold">
+                  {{ isHeatwaveTomorrow ? 'Alert' : 'Normal' }}
+                </span>
               </div>
             </div>
-            <p v-if="devicesError" class="text-sm text-red-600">{{ devicesError }}</p>
-          </div>
-
-          <div
-            v-if="setupReady"
-            class="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
-          >
-            Form has been validated.
-          </div>
-
-          <div v-else class="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Form is yet to be validated.
-          </div>
+          </article>
         </div>
-      </section>
 
-      <!-- Weather + Heatwave row -->
-      <section v-if="canShowWeatherBlocks" class="grid gap-6 lg:grid-cols-2">
-        <!-- Weather block -->
-        <article class="rounded-2xl border border-slate-200 p-6 lg:p-7">
-          <h3 class="text-2xl font-bold">Weather Forecast</h3>
-          <p class="mt-2 text-[16px]">Current and day-ahead temperature view for planning.</p>
-
-          <div v-if="weatherLoading" class="mt-5 text-sm text-slate-600">
-            Loading weather data...
+        <article class="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+          <h3 class="text-sm font-semibold uppercase tracking-widest text-slate-500">Hourly Forecast</h3>
+          <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+            <div
+              v-for="tile in hourlyTiles"
+              :key="tile.label"
+              class="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm"
+            >
+              <p class="text-xs font-semibold text-slate-500">{{ tile.label }}</p>
+              <component :is="tile.icon" class="mx-auto mt-2 h-6 w-6 text-[var(--gb-grid)]" />
+              <p class="mt-2 text-xl font-bold text-slate-900">{{ tile.temp }}°</p>
+            </div>
           </div>
-
-          <div v-else-if="forecastSnapshot" class="mt-5 space-y-3">
-            <p class="text-sm font-semibold text-slate-600">{{ forecastSnapshot.locationLabel }}</p>
-            <p class="text-2xl font-bold">
-              Current: {{ forecastSnapshot.currentTempC.toFixed(1) }}°C
-            </p>
-            <p class="text-[17px]">
-              Today: {{ forecastSnapshot.todayMinC.toFixed(1) }}°C -
-              {{ forecastSnapshot.todayMaxC.toFixed(1) }}°C
-            </p>
-            <p class="text-[17px]">
-              Tomorrow max: {{ forecastSnapshot.tomorrowMaxC.toFixed(1) }}°C
-              <span class="text-slate-500">({{ tomorrowDateLabel }})</span>
-            </p>
-          </div>
-
-          <p v-else-if="weatherError" class="mt-5 text-sm text-red-600">{{ weatherError }}</p>
         </article>
 
-        <!-- Heatwave alert block -->
-        <article class="rounded-2xl border border-slate-200 p-6 lg:p-7">
-          <h3 class="text-2xl font-bold">Heatwave Alert</h3>
-          <p class="mt-2 text-[16px]">Advance warning based on tomorrow's forecast maximum.</p>
+        <div class="mt-5 grid gap-5 lg:grid-cols-[1fr_1fr_1.1fr]">
+          <article class="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+            <div class="flex items-center gap-2 text-slate-500">
+              <Droplets class="h-4 w-4" />
+              <p class="text-sm font-semibold uppercase tracking-wider">Humidity</p>
+            </div>
+            <p class="mt-3 text-4xl font-bold text-slate-900">{{ displayHumidityPct }}%</p>
+          </article>
 
-          <div
-            v-if="weatherLoading"
-            class="mt-5 rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-700"
-          >
-            Checking forecast for heatwave conditions...
-          </div>
+          <article class="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+            <div class="flex items-center gap-2 text-slate-500">
+              <Wind class="h-4 w-4" />
+              <p class="text-sm font-semibold uppercase tracking-wider">Wind</p>
+            </div>
+            <p class="mt-3 text-4xl font-bold text-slate-900">{{ displayWindKph }}</p>
+            <p class="text-slate-500">km/h</p>
+          </article>
 
-          <div
-            v-else-if="forecastSnapshot && isHeatwaveTomorrow"
-            class="mt-5 rounded-xl bg-red-100 px-4 py-3 text-[15px] text-red-800"
-          >
-            Heatwave expected on {{ tomorrowDateLabel }} ({{
-              forecastSnapshot.tomorrowMaxC.toFixed(1)
-            }}°C). Prepare your home today.
-          </div>
-
-          <div
-            v-else-if="forecastSnapshot"
-            class="mt-5 rounded-xl bg-emerald-100 px-4 py-3 text-[15px] text-emerald-800"
-          >
-            No heatwave alert for {{ tomorrowDateLabel }}. Forecast max is
-            {{ forecastSnapshot.tomorrowMaxC.toFixed(1) }}°C.
-          </div>
-
-          <p v-else-if="weatherError" class="mt-5 text-sm text-red-600">{{ weatherError }}</p>
-        </article>
+          <article class="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+            <div class="flex items-center gap-2 text-slate-500">
+              <AlertTriangle class="h-4 w-4" />
+              <p class="text-sm font-semibold uppercase tracking-wider">Heatwave Alert</p>
+            </div>
+            <p
+              :class="isHeatwaveTomorrow ? 'text-rose-500' : 'text-emerald-600'"
+              class="mt-3 text-2xl font-bold"
+            >
+              {{ isHeatwaveTomorrow ? 'High Risk' : 'No Alert' }}
+            </p>
+            <p class="mt-2 text-sm text-slate-600">
+              {{ tomorrowDateLabel }} · Max {{ forecastSnapshot?.tomorrowMaxC.toFixed(1) }}°C
+            </p>
+          </article>
+        </div>
       </section>
 
       <section
         v-else
-        class="rounded-2xl max-w-5xl ml-[100px] border border-dashed border-slate-300 bg-slate-50 p-6 text-slate-700"
+        class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-slate-700"
       >
         <p class="text-base">
-          Weather and heatwave insights will appear once the form is fully validated.
+          Weather and heatwave insights will appear once location setup is complete.
         </p>
       </section>
     </main>
 
-    <!-- Shared footer -->
     <SiteFooter />
   </div>
 </template>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Imports
-import { Home, LineChart, Leaf } from 'lucide-vue-next'
+import { Home, LineChart, Leaf, UserRound } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
@@ -44,6 +44,16 @@ const isActive = computed(() => (to: string) => route.path === to)
           <RouterLink :to="tab.to" class="flex items-center gap-2">
             <component :is="tab.icon" class="h-4 w-4" />
             {{ tab.label }}
+          </RouterLink>
+        </Button>
+
+        <Button
+          as-child
+          :variant="isActive('/profile-setup') ? 'default' : 'outline'"
+          class="h-11 w-11 rounded-full p-0"
+        >
+          <RouterLink to="/profile-setup" aria-label="Open profile setup">
+            <UserRound class="h-5 w-5" />
           </RouterLink>
         </Button>
       </nav>

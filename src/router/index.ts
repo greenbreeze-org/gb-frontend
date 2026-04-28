@@ -3,6 +3,7 @@ import AccessGateView from '@/views/AccessGateView.vue'
 import AwarenessView from '@/views/AwarenessView.vue'
 import ForecastView from '@/views/ForecastView.vue'
 import HomeView from '@/views/HomeView.vue'
+import ProfileSetupView from '@/views/ProfileSetupView.vue'
 
 const ACCESS_KEY = 'gb_access_granted'
 
@@ -23,6 +24,11 @@ const router = createRouter({
       path: '/forecast',
       name: 'forecast',
       component: ForecastView,
+    },
+    {
+      path: '/profile-setup',
+      name: 'profile-setup',
+      component: ProfileSetupView,
     },
     {
       path: '/awareness',
