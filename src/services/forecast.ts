@@ -7,6 +7,16 @@ export interface ForecastSnapshot {
   todayMaxC: number
   tomorrowMaxC: number
   tomorrowDate: string
+  humidityPct: number
+  windKph: number
+  weatherCode: number
+  isDay: boolean
+  hourly: Array<{
+    time: string
+    tempC: number
+    weatherCode: number
+    isDay: boolean
+  }>
   source: 'backend' | 'open-meteo' | 'fallback'
 }
 
@@ -17,11 +27,25 @@ interface BackendForecastResponse {
   todayMaxC?: number
   tomorrowMaxC?: number
   tomorrowDate?: string
+  humidityPct?: number
+  windKph?: number
+  weatherCode?: number
+  isDay?: boolean
 }
 
 interface OpenMeteoForecastResponse {
   current?: {
     temperature_2m?: number
+    relative_humidity_2m?: number
+    wind_speed_10m?: number
+    weather_code?: number
+    is_day?: number
+  }
+  hourly?: {
+    time?: string[]
+    temperature_2m?: number[]
+    weather_code?: number[]
+    is_day?: number[]
   }
   daily?: {
     time?: string[]
@@ -77,6 +101,11 @@ const fallbackSnapshot = (): ForecastSnapshot => {
     todayMaxC: 34.6,
     tomorrowMaxC: 37.2,
     tomorrowDate: tomorrow.toISOString().slice(0, 10),
+    humidityPct: 58,
+    windKph: 14,
+    weatherCode: 1,
+    isDay: true,
+    hourly: [],
     source: 'fallback',
   }
 }
@@ -104,6 +133,11 @@ const fetchFromBackend = async (params: {
     todayMaxC: response.todayMaxC ?? 0,
     tomorrowMaxC: response.tomorrowMaxC ?? 0,
     tomorrowDate: response.tomorrowDate ?? new Date().toISOString().slice(0, 10),
+    humidityPct: response.humidityPct ?? 0,
+    windKph: response.windKph ?? 0,
+    weatherCode: response.weatherCode ?? 0,
+    isDay: response.isDay ?? true,
+    hourly: [],
     source: 'backend',
   }
 }
@@ -190,7 +224,11 @@ const fetchFromOpenMeteo = async (params: {
   const forecastUrl = new URL('https://api.open-meteo.com/v1/forecast')
   forecastUrl.searchParams.set('latitude', String(lat))
   forecastUrl.searchParams.set('longitude', String(lon))
-  forecastUrl.searchParams.set('current', 'temperature_2m')
+  forecastUrl.searchParams.set(
+    'current',
+    'temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,is_day',
+  )
+  forecastUrl.searchParams.set('hourly', 'temperature_2m,weather_code,is_day')
   forecastUrl.searchParams.set('daily', 'temperature_2m_min,temperature_2m_max')
   forecastUrl.searchParams.set('timezone', 'Australia/Melbourne')
   forecastUrl.searchParams.set('forecast_days', '3')
@@ -204,6 +242,25 @@ const fetchFromOpenMeteo = async (params: {
   const dailyTimes = data.daily?.time ?? []
   const dailyMins = data.daily?.temperature_2m_min ?? []
   const dailyMaxes = data.daily?.temperature_2m_max ?? []
+  const hourlyTimes = data.hourly?.time ?? []
+  const hourlyTemps = data.hourly?.temperature_2m ?? []
+  const hourlyCodes = data.hourly?.weather_code ?? []
+  const hourlyIsDay = data.hourly?.is_day ?? []
+  const now = Date.now()
+  const hourly = hourlyTimes
+    .map((time, index) => {
+      const ms = Date.parse(time)
+      return {
+        time,
+        ms,
+        tempC: round(hourlyTemps[index] ?? 0),
+        weatherCode: Math.round(hourlyCodes[index] ?? 0),
+        isDay: (hourlyIsDay[index] ?? 1) === 1,
+      }
+    })
+    .filter((item) => !Number.isNaN(item.ms) && item.ms >= now)
+    .slice(0, 24)
+    .map(({ time, tempC, weatherCode, isDay }) => ({ time, tempC, weatherCode, isDay }))
 
   return {
     locationLabel,
@@ -212,6 +269,11 @@ const fetchFromOpenMeteo = async (params: {
     todayMaxC: round(dailyMaxes[0] ?? 0),
     tomorrowMaxC: round(dailyMaxes[1] ?? dailyMaxes[0] ?? 0),
     tomorrowDate: dailyTimes[1] ?? new Date().toISOString().slice(0, 10),
+    humidityPct: Math.round(data.current?.relative_humidity_2m ?? 0),
+    windKph: round(data.current?.wind_speed_10m ?? 0),
+    weatherCode: Math.round(data.current?.weather_code ?? 0),
+    isDay: (data.current?.is_day ?? 1) === 1,
+    hourly,
     source: 'open-meteo',
   }
 }

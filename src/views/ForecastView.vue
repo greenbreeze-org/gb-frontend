@@ -4,15 +4,21 @@ import { computed, onMounted, ref, watch } from 'vue'
 import {
   AlertTriangle,
   CloudLightning,
+  CloudMoon,
   CloudRain,
+  CloudSnow,
   CloudSun,
   Droplets,
+  Moon,
   Sun,
   Wind,
 } from 'lucide-vue-next'
 
 import SiteFooter from '@/components/layout/SiteFooter.vue'
 import SiteHeader from '@/components/layout/SiteHeader.vue'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { fetchForecastSnapshot, type ForecastSnapshot } from '@/services/forecast'
@@ -168,59 +174,73 @@ const isHeatwaveTomorrow = computed(
   () => (forecastSnapshot.value?.tomorrowMaxC ?? 0) >= HEATWAVE_THRESHOLD_C,
 )
 
+const weatherCodeToLabel = (code: number, isDay: boolean) => {
+  if (code === 0) return isDay ? 'Clear Sky' : 'Clear Night'
+  if (code === 1) return isDay ? 'Mainly Sunny' : 'Mainly Clear'
+  if (code === 2) return 'Partly Cloudy'
+  if (code === 3) return 'Overcast'
+  if ([45, 48].includes(code)) return 'Foggy'
+  if ([51, 53, 55, 56, 57].includes(code)) return 'Drizzle'
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return 'Rain Showers'
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'Snow'
+  if ([95, 96, 99].includes(code)) return 'Thunderstorm'
+  return 'Weather'
+}
+
+const weatherCodeToIcon = (code: number, isDay: boolean) => {
+  if (code === 0) return isDay ? Sun : Moon
+  if (code === 1) return isDay ? Sun : Moon
+  if ([2, 3].includes(code)) return isDay ? CloudSun : CloudMoon
+  if ([45, 48].includes(code)) return CloudSun
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return CloudRain
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return CloudSnow
+  if ([95, 96, 99].includes(code)) return CloudLightning
+  return isDay ? CloudSun : CloudMoon
+}
+
 const conditionLabel = computed(() => {
   if (!forecastSnapshot.value) return 'Weather'
-  if (isHeatwaveTomorrow.value) return 'Heatwave Risk'
-  if (displayWindKph.value >= 28) return 'Windy Conditions'
-  if (displayHumidityPct.value >= 75) return 'Humid Conditions'
-  return 'Mostly Clear'
+  if (isHeatwaveTomorrow.value && [95, 96, 99].includes(forecastSnapshot.value.weatherCode)) {
+    return 'Severe Heat + Storm Risk'
+  }
+  return weatherCodeToLabel(forecastSnapshot.value.weatherCode, forecastSnapshot.value.isDay)
 })
 
 const currentConditionIcon = computed(() => {
   if (!forecastSnapshot.value) return CloudSun
-  if (isHeatwaveTomorrow.value) return CloudLightning
-  if (displayHumidityPct.value >= 75) return CloudRain
-  return Sun
+  return weatherCodeToIcon(forecastSnapshot.value.weatherCode, forecastSnapshot.value.isDay)
 })
 
 const hourlyTiles = computed(() => {
   const snapshot = forecastSnapshot.value
   if (!snapshot) return []
+  if (!snapshot.hourly.length) return []
 
-  const base = Math.round(snapshot.currentTempC)
-  const labels = ['Now', '12:00', '15:00', '18:00', '21:00', '00:00']
-  const values = [
-    base,
-    Math.max(base + 1, Math.round((base + snapshot.todayMaxC) / 2)),
-    Math.round(snapshot.todayMaxC),
-    Math.round((snapshot.todayMaxC + snapshot.todayMinC) / 2),
-    Math.max(Math.round(snapshot.todayMinC + 2), base - 1),
-    Math.round(snapshot.todayMinC + 1),
-  ]
+  return snapshot.hourly.slice(0, 6).map((entry, index) => {
+    const date = new Date(entry.time)
+    const label =
+      index === 0
+        ? 'Now'
+        : date.toLocaleTimeString('en-AU', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          })
 
-  return labels.map((label, index) => ({
-    label,
-    temp: values[index],
-    icon:
-      isHeatwaveTomorrow.value && index >= 2
-        ? CloudLightning
-        : displayHumidityPct.value >= 75 && index >= 3
-          ? CloudRain
-          : CloudSun,
-  }))
+    return {
+      label,
+      temp: Math.round(entry.tempC),
+      icon: weatherCodeToIcon(entry.weatherCode, entry.isDay),
+    }
+  })
 })
 
 const displayHumidityPct = computed(() => {
-  if (!forecastSnapshot.value) return 0
-  const spread = Math.max(0, forecastSnapshot.value.todayMaxC - forecastSnapshot.value.todayMinC)
-  return Math.max(44, Math.min(88, Math.round(82 - spread * 2.3)))
+  return forecastSnapshot.value?.humidityPct ?? 0
 })
 
 const displayWindKph = computed(() => {
-  if (!forecastSnapshot.value) return 0
-  const spread = Math.max(0, forecastSnapshot.value.todayMaxC - forecastSnapshot.value.todayMinC)
-  const deltaFromCurrent = Math.abs(forecastSnapshot.value.todayMaxC - forecastSnapshot.value.currentTempC)
-  return Math.max(8, Math.min(38, Math.round(10 + spread * 1.4 + deltaFromCurrent * 1.2)))
+  return Math.round(forecastSnapshot.value?.windKph ?? 0)
 })
 
 const loadForecastBlocks = async () => {
@@ -284,7 +304,7 @@ watch(
     <SiteHeader />
 
     <main class="max-w-7xl align mx-auto space-y-5 px-4 py-6 lg:px-8">
-      <section class="rounded-3xl border border-slate-200 bg-slate-50 p-4 shadow-sm lg:p-5">
+      <Card class="rounded-3xl border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm lg:p-5">
         <div class="grid gap-4 lg:grid-cols-[1.2fr_1fr] lg:items-end">
           <div>
             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Location Setup</p>
@@ -304,27 +324,43 @@ watch(
             <p class="text-xs text-slate-500">Used when location permission is denied/unavailable.</p>
           </div>
         </div>
-      </section>
+      </Card>
 
-      <section
+      <Alert
         v-if="showSetupAlert"
-        class="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-800"
+        variant="destructive"
+        class="rounded-2xl border-red-200 bg-red-50 px-5 py-4 text-red-800"
       >
-        <p class="text-sm font-semibold lg:text-base">
-          Setup required: location permission is unavailable. Add a valid VIC postcode below.
-        </p>
-      </section>
+        <AlertTriangle class="h-4 w-4" />
+        <AlertTitle>Setup Required</AlertTitle>
+        <AlertDescription class="font-semibold lg:text-base">
+          Location permission is unavailable. Add a valid VIC postcode below.
+        </AlertDescription>
+      </Alert>
 
       <p v-if="locationError" class="text-sm font-medium text-red-600">{{ locationError }}</p>
 
-      <section
+      <Card
         v-if="canShowWeatherBlocks"
-        class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm lg:p-6"
+        class="rounded-3xl border-slate-200 bg-white p-4 shadow-sm lg:p-6"
       >
+        <div class="mb-4 flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Forecast Dashboard</p>
+            <p class="text-sm text-slate-600">Live weather, hourly trend, and alert intelligence</p>
+          </div>
+          <Badge variant="outline" class="rounded-full border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">
+            {{ forecastSnapshot?.source === 'backend' ? 'Live Backend' : 'Live Forecast' }}
+          </Badge>
+        </div>
+
         <div class="grid gap-5 lg:grid-cols-[1.15fr_1fr]">
-          <article class="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
-            <p class="text-sm text-slate-500">{{ forecastSnapshot?.locationLabel }}</p>
-            <div class="mt-4 flex items-center justify-between">
+          <Card class="rounded-3xl border-slate-200 bg-gradient-to-br from-slate-50 to-white p-6 shadow-sm">
+            <CardHeader class="p-0">
+              <CardTitle class="text-sm font-normal text-slate-500">{{ forecastSnapshot?.locationLabel }}</CardTitle>
+            </CardHeader>
+            <CardContent class="mt-4 p-0">
+              <div class="flex items-center justify-between">
               <div>
                 <p class="text-6xl font-bold leading-none text-slate-900">
                   {{ forecastSnapshot?.currentTempC.toFixed(0) }}°
@@ -335,39 +371,47 @@ watch(
                   {{ forecastSnapshot?.todayMaxC.toFixed(0) }}°
                 </p>
               </div>
-              <component :is="currentConditionIcon" class="h-20 w-20 text-[var(--gb-grid)]" />
+              <div class="rounded-2xl bg-white p-3 shadow-sm">
+                <component :is="currentConditionIcon" class="h-14 w-14 text-[var(--gb-grid)]" />
+              </div>
             </div>
-          </article>
+            </CardContent>
+          </Card>
 
-          <article class="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
-            <h3 class="text-sm font-semibold uppercase tracking-widest text-slate-500">10-Day Focus</h3>
-            <div class="mt-4 space-y-3 text-sm">
-              <div class="flex items-center justify-between rounded-xl bg-white px-3 py-2">
+          <Card class="rounded-3xl border-slate-200 bg-gradient-to-br from-slate-50 to-white p-6 shadow-sm">
+            <CardHeader class="p-0">
+              <CardTitle class="text-sm font-semibold uppercase tracking-widest text-slate-500">10-Day Focus</CardTitle>
+            </CardHeader>
+            <CardContent class="mt-4 space-y-3 p-0 text-sm">
+              <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2">
                 <span class="text-slate-600">Today</span>
                 <span class="font-semibold text-slate-900">
                   {{ forecastSnapshot?.todayMaxC.toFixed(0) }}° /
                   {{ forecastSnapshot?.todayMinC.toFixed(0) }}°
                 </span>
               </div>
-              <div class="flex items-center justify-between rounded-xl bg-white px-3 py-2">
+              <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2">
                 <span class="text-slate-600">Tomorrow</span>
                 <span class="font-semibold text-slate-900">
                   {{ forecastSnapshot?.tomorrowMaxC.toFixed(0) }}° max
                 </span>
               </div>
-              <div class="flex items-center justify-between rounded-xl bg-white px-3 py-2">
+              <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2">
                 <span class="text-slate-600">Heatwave status</span>
                 <span :class="isHeatwaveTomorrow ? 'text-rose-500' : 'text-emerald-600'" class="font-semibold">
                   {{ isHeatwaveTomorrow ? 'Alert' : 'Normal' }}
                 </span>
               </div>
-            </div>
-          </article>
+            </CardContent>
+          </Card>
         </div>
 
-        <article class="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
-          <h3 class="text-sm font-semibold uppercase tracking-widest text-slate-500">Hourly Forecast</h3>
-          <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <Card class="mt-5 rounded-3xl border-slate-200 bg-gradient-to-br from-slate-50 to-white p-6 shadow-sm">
+          <CardHeader class="p-0">
+            <CardTitle class="text-sm font-semibold uppercase tracking-widest text-slate-500">Hourly Forecast</CardTitle>
+          </CardHeader>
+          <CardContent class="mt-4 p-0">
+            <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
             <div
               v-for="tile in hourlyTiles"
               :key="tile.label"
@@ -377,29 +421,35 @@ watch(
               <component :is="tile.icon" class="mx-auto mt-2 h-6 w-6 text-[var(--gb-grid)]" />
               <p class="mt-2 text-xl font-bold text-slate-900">{{ tile.temp }}°</p>
             </div>
-          </div>
-        </article>
+            </div>
+          </CardContent>
+        </Card>
 
         <div class="mt-5 grid gap-5 lg:grid-cols-[1fr_1fr_1.1fr]">
-          <article class="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
-            <div class="flex items-center gap-2 text-slate-500">
+          <Card class="rounded-3xl border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5 shadow-sm">
+            <CardContent class="p-0">
+              <div class="flex items-center gap-2 text-slate-500">
               <Droplets class="h-4 w-4" />
               <p class="text-sm font-semibold uppercase tracking-wider">Humidity</p>
             </div>
             <p class="mt-3 text-4xl font-bold text-slate-900">{{ displayHumidityPct }}%</p>
-          </article>
+            </CardContent>
+          </Card>
 
-          <article class="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
-            <div class="flex items-center gap-2 text-slate-500">
+          <Card class="rounded-3xl border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5 shadow-sm">
+            <CardContent class="p-0">
+              <div class="flex items-center gap-2 text-slate-500">
               <Wind class="h-4 w-4" />
               <p class="text-sm font-semibold uppercase tracking-wider">Wind</p>
             </div>
             <p class="mt-3 text-4xl font-bold text-slate-900">{{ displayWindKph }}</p>
             <p class="text-slate-500">km/h</p>
-          </article>
+            </CardContent>
+          </Card>
 
-          <article class="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
-            <div class="flex items-center gap-2 text-slate-500">
+          <Card class="rounded-3xl border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5 shadow-sm">
+            <CardContent class="p-0">
+              <div class="flex items-center gap-2 text-slate-500">
               <AlertTriangle class="h-4 w-4" />
               <p class="text-sm font-semibold uppercase tracking-wider">Heatwave Alert</p>
             </div>
@@ -412,18 +462,19 @@ watch(
             <p class="mt-2 text-sm text-slate-600">
               {{ tomorrowDateLabel }} · Max {{ forecastSnapshot?.tomorrowMaxC.toFixed(1) }}°C
             </p>
-          </article>
+            </CardContent>
+          </Card>
         </div>
-      </section>
+      </Card>
 
-      <section
+      <Card
         v-else
-        class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-slate-700"
+        class="rounded-2xl border-dashed border-slate-300 bg-slate-50 p-6 text-slate-700"
       >
-        <p class="text-base">
-          Weather and heatwave insights will appear once location setup is complete.
-        </p>
-      </section>
+        <CardContent class="p-0">
+          <p class="text-base">Weather and heatwave insights will appear once location setup is complete.</p>
+        </CardContent>
+      </Card>
     </main>
 
     <SiteFooter />
