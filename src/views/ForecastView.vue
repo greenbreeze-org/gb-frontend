@@ -17,7 +17,6 @@ import {
   type ChartOptions,
 } from 'chart.js'
 import {
-  AlertTriangle,
   Droplets,
   Sun,
   Thermometer,
@@ -26,8 +25,8 @@ import {
 
 import SiteFooter from '@/components/layout/SiteFooter.vue'
 import SiteHeader from '@/components/layout/SiteHeader.vue'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { fetchForecastSnapshot, type ForecastSnapshot } from '@/services/forecast'
@@ -46,6 +45,7 @@ ChartJS.register(
 const STORAGE_KEY = 'forecast_setup_v2'
 
 const postcode = ref('')
+const activeFallbackPostcode = ref('3000')
 const houseMaterial = ref('')
 const selectedDevices = ref<string[]>([])
 
@@ -65,22 +65,23 @@ const hasValidVicPostcode = computed(() => {
 })
 
 const hasBrowserLocation = computed(() => Boolean(locationCoords.value))
+const hasValidActiveFallbackPostcode = computed(() => {
+  const code = Number(activeFallbackPostcode.value.trim())
+  if (Number.isNaN(code)) return false
+  return (code >= 3000 && code <= 3999) || (code >= 8000 && code <= 8999)
+})
 
 const isLocationValid = computed(() => {
   const usingBrowserLocation = locationStatus.value === 'granted' && hasBrowserLocation.value
   const usingPostcode =
     (locationStatus.value === 'denied' || locationStatus.value === 'unavailable') &&
-    hasValidVicPostcode.value
+    hasValidActiveFallbackPostcode.value
 
   return usingBrowserLocation || usingPostcode
 })
 
 const setupReady = computed(() => isLocationValid.value)
 const canShowWeatherBlocks = computed(() => setupReady.value)
-
-const showSetupAlert = computed(
-  () => locationStatus.value === 'denied' || locationStatus.value === 'unavailable',
-)
 
 const restoreSetupFromSession = () => {
   const raw = sessionStorage.getItem(STORAGE_KEY)
@@ -489,7 +490,7 @@ const loadForecastBlocks = async () => {
   try {
     const postcodeValue =
       locationStatus.value === 'denied' || locationStatus.value === 'unavailable'
-        ? postcode.value.trim()
+        ? activeFallbackPostcode.value.trim()
         : undefined
 
     const snapshot = await fetchForecastSnapshot({
@@ -506,16 +507,43 @@ const loadForecastBlocks = async () => {
   }
 }
 
+const submitFallbackPostcode = async () => {
+  if (!(locationStatus.value === 'denied' || locationStatus.value === 'unavailable')) return
+
+  if (!hasValidVicPostcode.value) {
+    weatherError.value = 'Please enter a valid VIC postcode.'
+    return
+  }
+
+  weatherError.value = ''
+  const nextPostcode = postcode.value.trim()
+  const changed = nextPostcode !== activeFallbackPostcode.value
+  activeFallbackPostcode.value = nextPostcode
+
+  if (!changed) {
+    await loadForecastBlocks()
+  }
+}
+
 onMounted(async () => {
   restoreSetupFromSession()
+  if (!postcode.value.trim()) {
+    postcode.value = '3000'
+  }
   await checkBrowserLocationPermission()
+  if (
+    (locationStatus.value === 'denied' || locationStatus.value === 'unavailable') &&
+    !hasValidActiveFallbackPostcode.value
+  ) {
+    activeFallbackPostcode.value = '3000'
+  }
   if (canShowWeatherBlocks.value) {
     await loadForecastBlocks()
   }
 })
 
 watch(
-  [postcode, locationStatus, locationCoords],
+  [locationStatus, locationCoords, activeFallbackPostcode],
   async () => {
     if (setupReady.value) {
       await loadForecastBlocks()
@@ -534,30 +562,11 @@ watch(
     <SiteHeader />
 
     <main class="w-full">
-      <div
-        v-if="locationStatus === 'denied' || locationStatus === 'unavailable'"
-        class="mx-auto w-full max-w-[1800px] space-y-2"
-      >
-        <Label for="postcode" class="text-sm font-semibold text-slate-700">Postcode (VIC fallback)</Label>
-        <Input id="postcode" v-model="postcode" placeholder="e.g. 3000" class="h-11 bg-white text-base" />
-      </div>
-
-      <Alert
-        v-if="showSetupAlert"
-        variant="destructive"
-        class="rounded-2xl border-red-200 bg-red-50 px-5 py-4 text-red-800"
-      >
-        <AlertTriangle class="h-4 w-4" />
-        <AlertDescription class="font-semibold lg:text-base">
-          Location permission is unavailable. Add a valid VIC postcode below.
-        </AlertDescription>
-      </Alert>
-
-      <div class="grid items-start gap-0 lg:grid-cols-[2.05fr_0.85fr]">
+      <div class="grid items-stretch gap-0 lg:grid-cols-[2.05fr_0.85fr]">
       <Card
         v-if="canShowWeatherBlocks"
         :class="dashboardToneClass"
-        class="relative w-full overflow-hidden rounded-none border-slate-200 bg-gradient-to-br p-6 shadow-sm lg:p-8"
+        class="relative h-full w-full overflow-hidden rounded-none border-transparent bg-gradient-to-br p-6 shadow-sm lg:p-8"
       >
         <video
           class="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-100"
@@ -702,15 +711,57 @@ watch(
 
       <Card
         v-if="canShowWeatherBlocks"
-        class="rounded-none border border-slate-200 text-center  bg-white p-5 text-slate-900 lg:sticky"
+        class="flex h-full flex-col rounded-none border border-slate-200 bg-white p-5 text-center text-slate-900"
       >
-        <DotLottieVue
-              class="-translate-x-15"
-              src="/lottie/forecast/two-people-thinking.lottie"
+        <div
+          :class="
+            locationStatus === 'denied' || locationStatus === 'unavailable'
+              ? 'mb-5 h-[170px] flex flex-col items-center gap-3'
+              : 'mb-5 h-[170px] flex items-center justify-center'
+          "
+        >
+          <form
+            v-if="locationStatus === 'denied' || locationStatus === 'unavailable'"
+            class="w-full max-w-[260px] text-left"
+            @submit.prevent="submitFallbackPostcode"
+          >
+            <Label for="postcode-inline" class="text-sm font-semibold text-slate-700">Enter Postcode</Label>
+            <Input
+              id="postcode-inline"
+              v-model="postcode"
+              placeholder="3000"
+              class="mt-1.5 h-10 bg-white px-3 text-sm"
+            />
+            <Button type="submit" class="mt-2 h-10 w-full bg-[var(--gb-electric)] px-3 text-sm font-bold text-slate-900 hover:bg-amber-300">
+              Enter
+            </Button>
+          </form>
+
+          <DotLottieVue
+              v-if="!(locationStatus === 'denied' || locationStatus === 'unavailable')"
+              class="h-full"
+              src="/lottie/forecast/planty.lottie"
               autoplay
               loop
-              style="width: 130%; height: 150%"
+              style="width: auto; height: 130%"
           />
+
+          <div
+            v-if="locationStatus === 'denied' || locationStatus === 'unavailable'"
+            class="w-full max-w-[320px] rounded-md border border-red-200 bg-red-50 px-3 py-2 text-left text-xs font-semibold leading-snug text-red-700"
+          >
+            Location is denied, you need to enter postcode.
+          </div>
+        </div>
+        <div class="h-[360px] w-full overflow-hidden">
+          <DotLottieVue
+                class="-translate-x-6"
+                src="/lottie/forecast/two-people-thinking.lottie"
+                autoplay
+                loop
+                style="width: 112%; height: 100%"
+            />
+        </div>
 
         <CardContent class="mt-3 space-y-3 p-0">
           <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
@@ -721,7 +772,7 @@ watch(
           </div>
           <a
             href="/awareness"
-            class="block rounded-xl border border-slate-300 bg-slate-900 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-slate-800"
+            class="block rounded-xl py-3 text-center text-sm font-bold text-white bg-[var(--gb-electric)] px-8 hover:bg-amber-300"
           >
             Go To Impact Lab
           </a>
