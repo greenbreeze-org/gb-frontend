@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Imports
-import { Home, LineChart, Leaf, UserRound } from 'lucide-vue-next'
+import { Home, LineChart, Leaf, Lightbulb, UserRound } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
@@ -13,6 +13,7 @@ const route = useRoute()
 const tabs = [
   { label: 'Home', to: '/', icon: Home },
   { label: 'Forecast', to: '/forecast', icon: LineChart },
+  { label: 'Smart Actions', to: '/smart-actions', icon: Lightbulb },
   { label: 'Awareness', to: '/awareness', icon: Leaf },
 ]
 
