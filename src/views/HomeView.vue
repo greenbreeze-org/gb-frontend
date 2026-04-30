@@ -159,7 +159,7 @@ onBeforeUnmount(() => {
     <!-- Story section: cause and impact chain -->
     <section class="w-full py-4">
       <!-- Story section: heading -->
-      <div class="relative w-full bg-[var(--gb-grid)] min-h-[280px] flex items-center justify-center overflow-hidden">
+      <div class="relative w-full bg-[var(--gb-grid)] min-h-[240px] flex items-center justify-center overflow-hidden">
         <div class="pointer-events-none absolute left-0 top-1/2 z-10 h-[130px] w-[130px] -translate-y-1/2 lg:h-[450px] lg:w-[450px]">
           <DotLottieVue
             src="/lottie/decor/cherry-flowers.lottie"
@@ -275,7 +275,7 @@ onBeforeUnmount(() => {
 
     <!-- Why section: one row, two columns -->
     <section class="w-full py-6">
-      <div class="relative w-full bg-[var(--gb-grid)] min-h-[280px] flex items-center justify-center overflow-hidden mb-20">
+      <div class="relative w-full bg-[var(--gb-grid)] min-h-[240px] flex items-center justify-center overflow-hidden mb-20">
         <div class="pointer-events-none absolute left-0 top-1/2 z-10 h-[130px] w-[130px] -translate-y-1/2 lg:h-[450px] lg:w-[450px]">
           <DotLottieVue
             src="/lottie/decor/cherry-flowers.lottie"
