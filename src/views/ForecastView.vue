@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { DotLottieVue } from '@lottiefiles/dotlottie-vue'
 import { Line } from 'vue-chartjs'
@@ -770,12 +771,12 @@ watch(
               Visit Impact Lab for personalized steps based on forecast risk and your home profile.
             </p>
           </div>
-          <a
-            href="/awareness"
+          <RouterLink
+            to="/smart-actions"
             class="block rounded-xl py-3 text-center text-sm font-bold text-white bg-[var(--gb-electric)] px-8 hover:bg-amber-300"
           >
-            Go To Impact Lab
-          </a>
+            Go To Smart Actions
+          </RouterLink>
         </CardContent>
       </Card>
       </div>
