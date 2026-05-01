@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import SiteFooter from '@/components/layout/SiteFooter.vue'
 import SiteHeader from '@/components/layout/SiteHeader.vue'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -44,6 +45,13 @@ const impactSummary = [
   { value: '2.1 kWh', label: 'Daily load shifted off-peak' },
   { value: '4', label: 'Actions completed today' },
 ]
+
+const flippedCards = ref<boolean[]>(recommendations.map(() => false))
+const showImpactSummary = ref(false)
+
+const toggleCardFlip = (index: number) => {
+  flippedCards.value[index] = !flippedCards.value[index]
+}
 </script>
 
 <template>
@@ -60,20 +68,34 @@ const impactSummary = [
         </p>
 
         <div class="mt-5 grid gap-4 md:grid-cols-2">
-          <Card
-            v-for="card in recommendations"
+          <button
+            v-for="(card, index) in recommendations"
             :key="card.title"
-            :class="card.colorClass"
-            class="border text-left"
+            type="button"
+            class="flip-card h-44 w-full text-left"
+            @click="toggleCardFlip(index)"
           >
-            <CardHeader>
-              <CardTitle class="text-lg font-bold">{{ card.title }}</CardTitle>
-            </CardHeader>
-            <CardContent class="pt-0">
-              <p class="text-sm font-semibold">Priority: {{ card.priority }}</p>
-              <p class="mt-2 text-sm">{{ card.reason }}</p>
-            </CardContent>
-          </Card>
+            <div class="flip-card-inner h-full w-full" :class="{ 'is-flipped': flippedCards[index] }">
+              <Card :class="card.colorClass" class="flip-card-face flip-card-front border">
+                <CardHeader>
+                  <CardTitle class="text-lg font-bold">{{ card.title }}</CardTitle>
+                </CardHeader>
+                <CardContent class="pt-0">
+                  <p class="text-sm font-semibold">Priority: {{ card.priority }}</p>
+                  <p class="mt-2 text-xs font-medium">Click to flip</p>
+                </CardContent>
+              </Card>
+
+              <Card class="flip-card-face flip-card-back border border-slate-200 bg-white text-slate-900">
+                <CardHeader>
+                  <CardTitle class="text-lg font-bold">Why this matters</CardTitle>
+                </CardHeader>
+                <CardContent class="pt-0">
+                  <p class="text-sm text-slate-700">{{ card.reason }}</p>
+                </CardContent>
+              </Card>
+            </div>
+          </button>
         </div>
       </section>
 
@@ -89,9 +111,16 @@ const impactSummary = [
             <span class="text-sm font-medium text-slate-800">{{ item }}</span>
           </label>
         </div>
+        <button
+          type="button"
+          class="mt-5 rounded-lg bg-[var(--gb-electric)] px-6 py-2 text-sm font-bold text-white hover:bg-amber-300"
+          @click="showImpactSummary = true"
+        >
+          Estimate Impact
+        </button>
       </section>
 
-      <section class="mt-10 w-full">
+      <section v-if="showImpactSummary" class="mt-10 w-full">
         <h2 class="text-2xl font-bold">Impact Summary</h2>
         <div class="mx-auto mt-4 grid w-full max-w-3xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card
@@ -111,3 +140,29 @@ const impactSummary = [
     <SiteFooter />
   </div>
 </template>
+
+<style scoped>
+.flip-card {
+  perspective: 1000px;
+}
+
+.flip-card-inner {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.35s ease;
+}
+
+.flip-card-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.flip-card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+.flip-card-back {
+  transform: rotateY(180deg);
+}
+</style>

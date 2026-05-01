@@ -733,7 +733,7 @@ watch(
               placeholder="3000"
               class="mt-1.5 h-10 bg-white px-3 text-sm"
             />
-            <Button type="submit" class="mt-2 h-10 w-full bg-[var(--gb-electric)] px-3 text-sm font-bold text-slate-900 hover:bg-amber-300">
+            <Button type="submit" class="mt-2 h-10 w-full bg-[var(--gb-electric)] px-3 text-sm font-bold text-white hover:bg-amber-300">
               Enter
             </Button>
           </form>
