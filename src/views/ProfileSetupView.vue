@@ -49,6 +49,12 @@ const isLocationValid = computed(() => {
 
   return usingBrowserLocation || usingPostcode
 })
+
+const isHouseMaterialValid = computed(() => Boolean(houseMaterial.value))
+const isDeviceSelectionValid = computed(() => selectedDevices.value.length > 0)
+const setupReady = computed(
+  () => isLocationValid.value && isHouseMaterialValid.value && isDeviceSelectionValid.value,
+)
 </script>
 
 <template>
