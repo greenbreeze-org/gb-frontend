@@ -15,6 +15,13 @@ const selectedDevices = ref<string[]>([])
 
 const locationStatus = ref<'checking' | 'granted' | 'denied' | 'unavailable'>('checking')
 const locationCoords = ref<{ lat: number; lon: number } | null>(null)
+
+const houseMaterialOptions = [
+  { value: 'brick-veneer', label: 'Brick Veneer' },
+  { value: 'double-brick', label: 'Double Brick' },
+  { value: 'weatherboard-timber', label: 'Weatherboard / Timber' },
+  { value: 'lightweight-cladding', label: 'Lightweight Cladding (Fiber Cement / Metal)' },
+]
 </script>
 
 <template>
