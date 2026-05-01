@@ -122,6 +122,36 @@ const requestBrowserLocation = async () => {
     locationCoords.value = null
   }
 }
+
+const checkBrowserLocationPermission = async () => {
+  if (!navigator.geolocation) {
+    locationStatus.value = 'unavailable'
+    return
+  }
+
+  if (!('permissions' in navigator)) {
+    await requestBrowserLocation()
+    return
+  }
+
+  try {
+    const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName })
+
+    if (permission.state === 'granted') {
+      await requestBrowserLocation()
+      return
+    }
+
+    if (permission.state === 'denied') {
+      locationStatus.value = 'denied'
+      return
+    }
+
+    await requestBrowserLocation()
+  } catch {
+    await requestBrowserLocation()
+  }
+}
 </script>
 
 <template>
