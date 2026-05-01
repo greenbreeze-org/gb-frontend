@@ -65,6 +65,38 @@ const houseMaterialError = computed(() =>
 const devicesError = computed(() =>
   isDeviceSelectionValid.value ? '' : 'Please select at least one heating/cooling device.',
 )
+
+const restoreSetupFromSession = () => {
+  const raw = sessionStorage.getItem(STORAGE_KEY)
+  if (!raw) return
+
+  try {
+    const parsed = JSON.parse(raw) as {
+      postcode?: string
+      houseMaterial?: string
+      selectedDevices?: string[]
+    }
+
+    postcode.value = parsed.postcode ?? ''
+    houseMaterial.value = parsed.houseMaterial ?? ''
+    selectedDevices.value = Array.isArray(parsed.selectedDevices) ? parsed.selectedDevices : []
+  } catch {
+    sessionStorage.removeItem(STORAGE_KEY)
+  }
+}
+
+const persistSetupToSession = () => {
+  sessionStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      postcode: postcode.value,
+      houseMaterial: houseMaterial.value,
+      selectedDevices: selectedDevices.value,
+    }),
+  )
+}
+
+watch([postcode, houseMaterial, selectedDevices], persistSetupToSession, { deep: true })
 </script>
 
 <template>
