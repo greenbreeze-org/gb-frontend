@@ -12,6 +12,9 @@ const STORAGE_KEY = 'forecast_setup_v2'
 const postcode = ref('')
 const houseMaterial = ref('')
 const selectedDevices = ref<string[]>([])
+
+const locationStatus = ref<'checking' | 'granted' | 'denied' | 'unavailable'>('checking')
+const locationCoords = ref<{ lat: number; lon: number } | null>(null)
 </script>
 
 <template>
