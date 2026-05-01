@@ -33,6 +33,22 @@ const deviceOptions = [
   { value: 'electric_heater', label: 'Electric Heater' },
   { value: 'gas_heater', label: 'Gas Heater' },
 ]
+
+const hasValidVicPostcode = computed(() => {
+  const code = Number(postcode.value.trim())
+  if (Number.isNaN(code)) return false
+  return (code >= 3000 && code <= 3999) || (code >= 8000 && code <= 8999)
+})
+
+const hasBrowserLocation = computed(() => Boolean(locationCoords.value))
+const isLocationValid = computed(() => {
+  const usingBrowserLocation = locationStatus.value === 'granted' && hasBrowserLocation.value
+  const usingPostcode =
+    (locationStatus.value === 'denied' || locationStatus.value === 'unavailable') &&
+    hasValidVicPostcode.value
+
+  return usingBrowserLocation || usingPostcode
+})
 </script>
 
 <template>
