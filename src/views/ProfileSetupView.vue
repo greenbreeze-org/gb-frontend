@@ -97,6 +97,31 @@ const persistSetupToSession = () => {
 }
 
 watch([postcode, houseMaterial, selectedDevices], persistSetupToSession, { deep: true })
+
+const requestBrowserLocation = async () => {
+  if (!navigator.geolocation) {
+    locationStatus.value = 'unavailable'
+    return
+  }
+
+  try {
+    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 8000,
+      })
+    })
+
+    locationCoords.value = {
+      lat: position.coords.latitude,
+      lon: position.coords.longitude,
+    }
+    locationStatus.value = 'granted'
+  } catch {
+    locationStatus.value = 'denied'
+    locationCoords.value = null
+  }
+}
 </script>
 
 <template>
