@@ -22,6 +22,17 @@ const houseMaterialOptions = [
   { value: 'weatherboard-timber', label: 'Weatherboard / Timber' },
   { value: 'lightweight-cladding', label: 'Lightweight Cladding (Fiber Cement / Metal)' },
 ]
+
+const deviceOptions = [
+  { value: 'ac_split', label: 'Air Conditioner (Split System)' },
+  { value: 'ac_ducted', label: 'Air Conditioner (Ducted)' },
+  { value: 'evaporative', label: 'Evaporative Cooler' },
+  { value: 'fan_ceiling', label: 'Ceiling Fan' },
+  { value: 'fan_portable', label: 'Portable Fan' },
+  { value: 'heat_pump', label: 'Heat Pump Heater' },
+  { value: 'electric_heater', label: 'Electric Heater' },
+  { value: 'gas_heater', label: 'Gas Heater' },
+]
 </script>
 
 <template>
