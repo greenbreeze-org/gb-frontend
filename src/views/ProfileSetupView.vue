@@ -152,6 +152,22 @@ const checkBrowserLocationPermission = async () => {
     await requestBrowserLocation()
   }
 }
+
+const toggleDevice = (value: string, checked: boolean) => {
+  if (checked) {
+    if (!selectedDevices.value.includes(value)) {
+      selectedDevices.value = [...selectedDevices.value, value]
+    }
+    return
+  }
+
+  selectedDevices.value = selectedDevices.value.filter((item) => item !== value)
+}
+
+onMounted(async () => {
+  restoreSetupFromSession()
+  await checkBrowserLocationPermission()
+})
 </script>
 
 <template>
