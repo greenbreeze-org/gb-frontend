@@ -55,6 +55,16 @@ const isDeviceSelectionValid = computed(() => selectedDevices.value.length > 0)
 const setupReady = computed(
   () => isLocationValid.value && isHouseMaterialValid.value && isDeviceSelectionValid.value,
 )
+
+const locationError = computed(() =>
+  isLocationValid.value ? '' : 'Location unavailable. Please enter a valid Victoria postcode.',
+)
+const houseMaterialError = computed(() =>
+  isHouseMaterialValid.value ? '' : 'Please select a house material.',
+)
+const devicesError = computed(() =>
+  isDeviceSelectionValid.value ? '' : 'Please select at least one heating/cooling device.',
+)
 </script>
 
 <template>
