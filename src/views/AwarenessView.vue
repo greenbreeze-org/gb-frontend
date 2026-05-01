@@ -433,6 +433,65 @@ onMounted(async () => {
       <p v-if="errorMessage" class="mt-2 text-sm font-semibold text-red-600">{{ errorMessage }}</p>
     </section>
 
+        <section class="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+      <Card class="border border-slate-200 bg-white shadow-sm">
+        <CardHeader>
+          <CardTitle class="text-xl font-bold">Energy Demand (VIC)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="h-72">
+            <Line :data="demandChartData" :options="demandChartOptions" />
+          </div>
+          <p class="mt-4 text-sm text-slate-700">{{ demandInsight }}</p>
+        </CardContent>
+      </Card>
+
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+        <Card class="border border-slate-200 bg-slate-50">
+          <CardContent class="py-5 text-center">
+            <p class="text-5xl font-extrabold text-slate-900">{{ demandPeakCount }}</p>
+            <p class="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-600">Demand Peak Points</p>
+          </CardContent>
+        </Card>
+        <Card class="border border-slate-200 bg-slate-50">
+          <CardContent class="py-5 text-center">
+            <p class="text-5xl font-extrabold text-slate-900">{{ demandAverage.toFixed(0) }}</p>
+            <p class="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-600">Average Demand (MW)</p>
+          </CardContent>
+        </Card>
+      </div>
+    </section>
+
+    <section class="grid gap-4 lg:grid-cols-[1fr_1.7fr]">
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+        <Card class="border border-slate-200 bg-slate-50">
+          <CardContent class="py-5 text-center">
+            <p class="text-5xl font-extrabold text-slate-900">{{ emissionsPeakCount }}</p>
+            <p class="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-600">Emission Peak Points</p>
+          </CardContent>
+        </Card>
+        <Card class="border border-slate-200 bg-slate-50">
+          <CardContent class="py-5 text-center">
+            <p class="text-5xl font-extrabold text-slate-900">{{ emissionsAverage.toFixed(0) }}</p>
+            <p class="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-600">Avg Emission Intensity</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card class="border border-slate-200 bg-white shadow-sm">
+        <CardHeader>
+          <CardTitle class="text-xl font-bold">Emissions Intensity (VIC)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="h-72">
+            <Line :data="emissionsChartData" :options="emissionsChartOptions" />
+          </div>
+          <p class="mt-4 text-sm text-slate-700">{{ emissionsInsight }}</p>
+        </CardContent>
+      </Card>
+    </section>
+  </main>
+
   <SiteFooter />
 </template>
 
