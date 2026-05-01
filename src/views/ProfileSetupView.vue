@@ -177,6 +177,93 @@ onMounted(async () => {
     <main class="mx-auto max-w-7xl px-6 py-10 lg:px-10">
       <section class="mx-auto max-w-5xl rounded-2xl border border-slate-200 p-8 lg:p-10">
         <h1 class="mb-8 text-center text-4xl font-bold tracking-tight">Profile Setup</h1>
+
+        <div class="mx-auto max-w-4xl">
+          <div class="mb-10 flex flex-wrap items-center justify-center gap-3">
+            <span
+              v-if="locationStatus === 'granted'"
+              class="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white"
+            >
+              Location Granted
+            </span>
+            <span
+              v-else-if="locationStatus === 'denied' || locationStatus === 'unavailable'"
+              class="rounded-md bg-red-600 px-3 py-1.5 text-sm font-semibold text-white"
+            >
+              Location Denied
+            </span>
+            <span
+              v-else
+              class="rounded-md bg-slate-600 px-3 py-1.5 text-sm font-semibold text-white"
+            >
+              Checking Location...
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div class="space-y-2">
+              <Label for="house-material" class="text-base font-semibold"
+                >House Material (Detached House)</Label
+              >
+              <select
+                id="house-material"
+                v-model="houseMaterial"
+                class="border-input focus-visible:ring-ring/50 h-11 w-full rounded-md border bg-white px-4 text-base outline-none focus-visible:ring-[3px]"
+              >
+                <option value="" disabled>Select house material</option>
+                <option
+                  v-for="option in houseMaterialOptions"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
+              <p v-if="houseMaterialError" class="text-sm text-red-600">{{ houseMaterialError }}</p>
+            </div>
+
+            <div
+              v-if="locationStatus === 'denied' || locationStatus === 'unavailable'"
+              class="space-y-2"
+            >
+              <Label for="postcode" class="text-base font-semibold"
+                >Postcode (VIC only, required when location is denied)</Label
+              >
+              <Input id="postcode" v-model="postcode" placeholder="e.g. 3000" class="h-11 text-base" />
+              <p v-if="locationError" class="text-sm text-red-600">{{ locationError }}</p>
+            </div>
+          </div>
+
+          <div class="mt-6 space-y-3">
+            <Label class="text-base font-semibold">Available Heating/Cooling Devices</Label>
+            <div class="grid gap-3 md:grid-cols-2">
+              <div
+                v-for="device in deviceOptions"
+                :key="device.value"
+                class="flex items-center gap-3 rounded-md py-1"
+              >
+                <Checkbox
+                  :id="device.value"
+                  :model-value="selectedDevices.includes(device.value)"
+                  @update:model-value="(checked) => toggleDevice(device.value, Boolean(checked))"
+                />
+                <Label :for="device.value" class="text-base">{{ device.label }}</Label>
+              </div>
+            </div>
+            <p v-if="devicesError" class="text-sm text-red-600">{{ devicesError }}</p>
+          </div>
+
+          <div
+            v-if="setupReady"
+            class="mt-6 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+          >
+            Profile setup is validated.
+          </div>
+
+          <div v-else class="mt-6 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Please complete all setup fields to unlock full forecast insights.
+          </div>
+        </div>
       </section>
     </main>
 
