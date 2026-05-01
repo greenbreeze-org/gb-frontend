@@ -123,6 +123,7 @@
   --gb-climate: #67e8f9;
   --gb-electric: #fbbf24;
   --gb-carbon: #cbd5e1;
+  --gb-secondary: #82d1c7;
 }
 
 @layer base {
@@ -133,13 +134,8 @@
     @apply bg-background text-foreground;
     font-family: 'Manrope', sans-serif;
   }
-  h1 {
+  h1,h2,h3 {
     color: var(--gb-grid);
-  }
-
-  h2,
-  h3 {
-    color: var(--gb-electric);
   }
 
   h1,
@@ -150,4 +146,8 @@
   h6 {
     font-family: 'Sora', sans-serif;
   }
+
+  p {
+  color: #6c6f75;
+}
 }

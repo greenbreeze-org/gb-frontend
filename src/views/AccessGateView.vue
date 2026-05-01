@@ -57,7 +57,9 @@ const unlockWebsite = async () => {
           <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
         </div>
 
-        <Button class="electric h-11 w-full text-base">Unlock Website</Button>
+        <Button class="h-11 w-full border border-amber-200 bg-[var(--gb-electric)] text-base text-slate-900 hover:bg-amber-300">
+          Unlock Website
+        </Button>
       </form>
     </section>
   </main>
