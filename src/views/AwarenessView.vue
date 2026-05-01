@@ -365,7 +365,73 @@ onMounted(async () => {
     </div>
   </div>
 
+    <main class="mx-auto max-w-7xl space-y-8 px-6 py-10 lg:px-10">
+    <section class="rounded-2xl border border-slate-200 p-5 text-black shadow-sm lg:p-6">
+      <div class="grid gap-4 lg:grid-cols-[1.2fr_3fr_auto] lg:items-end">
+        <div>
+          <Label for="range-mode" class="text-xs font-semibold uppercase tracking-wide text-black/90">Range</Label>
+          <select
+            id="range-mode"
+            v-model="rangeMode"
+            class="mt-1 h-10 w-full rounded-md border border-white/40 bg-white px-3 text-sm text-slate-900"
+          >
+            <option value="daily">Daily</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
 
+        <div class="grid gap-3 sm:grid-cols-2" v-if="rangeMode === 'daily'">
+          <div>
+            <Label for="daily-date" class="text-xs font-semibold uppercase tracking-wide text-slate-600">Date</Label>
+            <Input id="daily-date" v-model="selectedDate" type="date" class="mt-1 h-10 bg-white text-slate-900" />
+          </div>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-2" v-else-if="rangeMode === 'monthly'">
+          <div>
+            <Label for="month" class="text-xs font-semibold uppercase tracking-wide text-slate-600">Month</Label>
+            <Input id="month" v-model="selectedMonth" type="month" class="mt-1 h-10 bg-white text-slate-900" />
+          </div>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-2" v-else-if="rangeMode === 'yearly'">
+          <div>
+            <Label for="start-year" class="text-xs font-semibold uppercase tracking-wide text-slate-600">Start Year</Label>
+            <Input id="start-year" v-model="startYear" type="number" min="2000" max="2100" class="mt-1 h-10 bg-white text-slate-900" />
+          </div>
+          <div>
+            <Label for="end-year" class="text-xs font-semibold uppercase tracking-wide text-slate-600">End Year</Label>
+            <Input id="end-year" v-model="endYear" type="number" min="2000" max="2100" class="mt-1 h-10 bg-white text-slate-900" />
+          </div>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-2" v-else>
+          <div>
+            <Label for="custom-from" class="text-xs font-semibold uppercase tracking-wide text-slate-600">From</Label>
+            <Input id="custom-from" v-model="customFrom" type="datetime-local" class="mt-1 h-10 bg-white text-slate-900" />
+          </div>
+          <div>
+            <Label for="custom-to" class="text-xs font-semibold uppercase tracking-wide text-slate-600">To</Label>
+            <Input id="custom-to" v-model="customTo" type="datetime-local" class="mt-1 h-10 bg-white text-slate-900" />
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          class="h-10 bg-[var(--gb-electric)] px-5 text-white hover:bg-amber-300"
+          :disabled="loading"
+          @click="loadAwarenessData"
+        >
+          {{ loading ? 'Loading...' : 'Apply Range' }}
+        </Button>
+      </div>
+      <p class="mt-3 text-xs font-medium text-slate-500">
+        Peak periods are highlighted in red points. X-axis auto-adjusts to your selected range.
+      </p>
+      <p v-if="errorMessage" class="mt-2 text-sm font-semibold text-red-600">{{ errorMessage }}</p>
+    </section>
 
   <SiteFooter />
 </template>
