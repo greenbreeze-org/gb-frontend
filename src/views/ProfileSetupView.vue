@@ -6,6 +6,12 @@ import SiteHeader from '@/components/layout/SiteHeader.vue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+
+const STORAGE_KEY = 'forecast_setup_v2'
+
+const postcode = ref('')
+const houseMaterial = ref('')
+const selectedDevices = ref<string[]>([])
 </script>
 
 <template>
