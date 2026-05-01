@@ -150,4 +150,40 @@
   p {
   color: #6c6f75;
 }
+
+/* Windows laptop compatibility layer:
+   keeps Mac rendering unchanged while reducing oversized appearance/stretch on
+   low-DPR Windows displays (common 125% scaling scenarios). */
+@media (min-width: 1024px) {
+  html.platform-windows-lowdpr {
+    font-size: 15px;
+    zoom: 0.93;
+  }
+
+  html.platform-windows-lowdpr body {
+    overflow-x: hidden;
+  }
+
+  html.platform-windows-lowdpr .min-h-screen {
+    overflow-x: clip;
+  }
+
+  /* Keep animation/media blocks from stretching beyond wrappers when users
+     change browser zoom levels on Windows. */
+  html.platform-windows-lowdpr img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* Fallback for engines that don't apply `zoom` consistently. */
+@media (min-width: 1024px) {
+  @supports not (zoom: 1) {
+    html.platform-windows-lowdpr body {
+      transform: scale(0.93);
+      transform-origin: top left;
+      width: calc(100% / 0.93);
+    }
+  }
+}
 }
