@@ -1,6 +1,11 @@
 <script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+
 import SiteFooter from '@/components/layout/SiteFooter.vue'
 import SiteHeader from '@/components/layout/SiteHeader.vue'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 </script>
 
 <template>
