@@ -30,6 +30,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { apiGet, apiPost } from '@/services/http'
 import { fetchForecastSnapshot, type ForecastSnapshot } from '@/services/forecast'
 
 ChartJS.register(
@@ -56,8 +57,21 @@ const locationCoords = ref<{ lat: number; lon: number } | null>(null)
 const weatherLoading = ref(false)
 const weatherError = ref('')
 const forecastSnapshot = ref<ForecastSnapshot | null>(null)
+const chartHourlyFromApi = ref<Array<{ time: string; tempC: number }>>([])
 const HEATWAVE_THRESHOLD_C = 35
 const FORCE_NIGHT_VIDEO = false
+
+interface LocationResolveResponse {
+  lat: number
+  lon: number
+}
+
+interface ForecastWeatherResponse {
+  hourly?: Array<{
+    time?: string
+    tempC?: number
+  }>
+}
 
 const hasValidVicPostcode = computed(() => {
   const code = Number(postcode.value.trim())
@@ -354,8 +368,46 @@ const weeklyRows = computed(() => {
   })
 })
 
+const fetchChartHourlyFromWeatherApi = async () => {
+  let lat = locationCoords.value?.lat
+  let lon = locationCoords.value?.lon
+
+  if ((lat === undefined || lon === undefined) && hasValidActiveFallbackPostcode.value) {
+    const resolved = await apiPost<LocationResolveResponse>('/location/resolve', {
+      postcode: activeFallbackPostcode.value.trim(),
+    })
+    lat = resolved.lat
+    lon = resolved.lon
+  }
+
+  if (lat === undefined || lon === undefined) {
+    chartHourlyFromApi.value = []
+    return
+  }
+
+  const response = await apiGet<ForecastWeatherResponse>('/forecast/weather', {
+    lat: String(lat),
+    lon: String(lon),
+  })
+
+  chartHourlyFromApi.value = (response.hourly ?? [])
+    .map((entry) => ({
+      time: entry.time ?? '',
+      tempC: Number(entry.tempC ?? 0),
+    }))
+    .filter((entry) => Boolean(entry.time) && Number.isFinite(entry.tempC))
+}
+
 const next12Hourly = computed(() => {
-  const source = forecastSnapshot.value?.hourly ?? []
+  const source =
+    chartHourlyFromApi.value.length > 0
+      ? chartHourlyFromApi.value.map((entry) => ({
+          time: entry.time,
+          tempC: entry.tempC,
+          weatherCode: forecastSnapshot.value?.weatherCode ?? 0,
+          isDay: true,
+        }))
+      : (forecastSnapshot.value?.hourly ?? [])
   if (!source.length) return []
 
   const now = new Date()
@@ -501,6 +553,11 @@ const loadForecastBlocks = async () => {
     })
 
     forecastSnapshot.value = snapshot
+    try {
+      await fetchChartHourlyFromWeatherApi()
+    } catch {
+      chartHourlyFromApi.value = []
+    }
   } catch {
     weatherError.value = 'Unable to load weather right now. Please try again.'
   } finally {

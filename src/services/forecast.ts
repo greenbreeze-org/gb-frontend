@@ -269,7 +269,6 @@ const fetchFromOpenMeteo = async (params: {
   const hourlyTemps = data.hourly?.temperature_2m ?? []
   const hourlyCodes = data.hourly?.weather_code ?? []
   const hourlyIsDay = data.hourly?.is_day ?? []
-  const now = Date.now()
   const hourly = hourlyTimes
     .map((time, index) => {
       const ms = Date.parse(time)
