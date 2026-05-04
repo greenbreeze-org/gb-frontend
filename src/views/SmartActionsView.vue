@@ -233,6 +233,8 @@ onMounted(async () => {
 
 .flip-card-inner {
   position: relative;
+  height: 100%;
+  width: 100%;
   transform-style: preserve-3d;
   transition: transform 0.35s ease;
 }
@@ -245,6 +247,13 @@ onMounted(async () => {
   position: absolute;
   inset: 0;
   backface-visibility: hidden;
+}
+
+.flip-card-front,
+.flip-card-back {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .flip-card-back {

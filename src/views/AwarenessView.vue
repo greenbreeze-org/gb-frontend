@@ -381,7 +381,7 @@ onMounted(async () => {
           <select
             id="range-mode"
             v-model="rangeMode"
-            class="mt-1 h-10 w-full rounded-md border border-white/40 bg-white px-3 text-sm text-slate-900"
+            class="mt-1 h-10 w-full rounded-md border border-black/40 bg-white px-3 text-sm text-slate-900"
           >
             <option value="daily">Daily</option>
             <option value="monthly">Monthly</option>
