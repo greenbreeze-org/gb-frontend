@@ -157,15 +157,35 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- Story section: cause and impact chain -->
-    <section class="w-full py-16">
-      <div class="mx-auto max-w-7xl px-6 lg:px-10">
-        <!-- Story section: heading -->
-        <div class="mb-10">
-          <h1 class="text-3xl text-center font-bold mb-[5rem] tracking-tight lg:text-5xl">
-            How Peak Electricity Use Affects Climate
-          </h1>
+    <section class="w-full py-4">
+      <!-- Story section: heading -->
+      <div class="relative w-full bg-[var(--gb-grid)] min-h-[240px] flex items-center justify-center overflow-hidden">
+        <div class="pointer-events-none absolute left-0 top-1/2 z-10 h-[130px] w-[130px] -translate-y-1/2 lg:h-[450px] lg:w-[450px]">
+          <DotLottieVue
+            src="/lottie/decor/cherry-flowers.lottie"
+            :render-config="{ devicePixelRatio: 2, autoResize: true }"
+            autoplay
+            loop
+            style="width: 100%; height: 100%"
+          />
         </div>
 
+        <h1 class="px-20 text-center text-3xl font-bold tracking-tight text-white lg:px-40 lg:text-5xl">
+          How Peak Electricity Use Affects Climate
+        </h1>
+
+        <div class="pointer-events-none absolute right-25 top-1/2 z-10 h-[130px] w-[130px] -translate-y-[60%] lg:h-[200px] lg:w-[200px]">
+          <DotLottieVue
+            src="/lottie/decor/bulb.lottie"
+            :render-config="{ devicePixelRatio: 2, autoResize: true }"
+            autoplay
+            loop
+            style="width: 100%; height: 100%"
+          />
+        </div>
+      </div>
+
+      <div class="mx-auto mt-10 max-w-7xl px-6 lg:px-10">
         <!-- Story section: 3 rows (text + animation), middle row reversed -->
         <div class="space-y-6">
           <!-- Story row 1: text left, animation right -->
@@ -255,9 +275,31 @@ onBeforeUnmount(() => {
 
     <!-- Why section: one row, two columns -->
     <section class="w-full py-6">
-      <h1 class="text-3xl text-center font-bold mb-[4rem] tracking-tight lg:text-5xl">
-        Why GreenBreeze Exists ?
-      </h1>
+      <div class="relative w-full bg-[var(--gb-grid)] min-h-[240px] flex items-center justify-center overflow-hidden mb-20">
+        <div class="pointer-events-none absolute left-0 top-1/2 z-10 h-[130px] w-[130px] -translate-y-1/2 lg:h-[450px] lg:w-[450px]">
+          <DotLottieVue
+            src="/lottie/decor/cherry-flowers.lottie"
+            :render-config="{ devicePixelRatio: 2, autoResize: true }"
+            autoplay
+            loop
+            style="width: 100%; height: 100%"
+          />
+        </div>
+
+        <h1 class="px-20 text-center text-3xl font-bold tracking-tight text-white lg:px-40 lg:text-5xl">
+          Why does GreenBreeze exists ?
+        </h1>
+
+        <div class="pointer-events-none absolute right-25 top-1/2 z-10 h-[130px] w-[130px] -translate-y-[60%] lg:h-[200px] lg:w-[200px]">
+          <DotLottieVue
+            src="/lottie/decor/bulb.lottie"
+            :render-config="{ devicePixelRatio: 2, autoResize: true }"
+            autoplay
+            loop
+            style="width: 100%; height: 100%"
+          />
+        </div>
+      </div>
 
       <div class="mx-auto grid max-w-7xl items-center gap-10 px-6 lg:grid-cols-2 lg:px-10">
         <!-- Why section: left image -->
@@ -282,60 +324,63 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <!-- How it works section: one row, three columns -->
-    <section class="w-full py-10 mt-[6rem]">
-      <div class="mx-auto max-w-7xl px-6 lg:px-10">
-        <h1 class="mb-[4rem] text-center text-3xl font-bold tracking-tight lg:text-5xl">
-          How It Works
-        </h1>
+    <!-- How it works section: curved split layout -->
+    <section class="w-full mt-[6rem]">
+      <div class="relative overflow-hidden bg-white pb-20 pt-10 min-h-[760px] lg:pb-28 lg:pt-14 lg:min-h-[650px]">
+        <div class="relative z-20 mx-auto max-w-7xl px-6 lg:px-10">
+          <h1 class="text-center text-3xl font-bold tracking-tight lg:text-5xl">How It Works</h1>
+        </div>
 
-        <div class="grid gap-12 md:grid-cols-3">
-          <!-- How it works: step 1 -->
-          <article class="text-center">
-            <div class="mx-auto h-[260px] w-full max-w-[320px]">
+        <svg
+          class="pointer-events-none absolute inset-x-0 top-[16%] z-0 h-[88%] w-full"
+          viewBox="0 0 1440 620"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M0,210 C150,85 280,-10 460,220 C640,500 790,470 930,330 C1090,120 1260,60 1440,185 L1440,620 L0,620 Z"
+            fill="var(--gb-grid)"
+          />
+        </svg>
+
+        <div
+          class="relative z-20 mx-auto mt-14 grid max-w-7xl gap-10 px-6 md:grid-cols-3 lg:mt-16 lg:px-10"
+        >
+          <article class="text-center md:translate-y-24 -translate-x-[120px]">
+            <div class="mx-auto h-[220px] w-[220px] lg:h-[250px] lg:w-[250px]">
               <img
                 src="/how-it-works/settings.svg"
                 alt="Set location and home profile"
                 class="h-full w-full object-contain"
               />
             </div>
-            <h3 class="mt-4 text-xl font-bold lg:text-2xl">Set Location + Home Profile</h3>
-            <!-- <p class="mt-3 text-[18px]">
-              Enter your location, home type, and available heating/cooling devices so guidance
-              matches your household setup.
-            </p> -->
+            <h3 class="mt-4 text-xl font-bold text-white lg:text-2xl">Set Location + Home Profile</h3>
           </article>
 
-          <!-- How it works: step 2 -->
-          <article class="text-center">
-            <div class="mx-auto h-[260px] w-full max-w-[320px]">
+          <article class="text-center md:-translate-y-8">
+            <div class="mx-auto h-[220px] w-[220px] lg:h-[250px] lg:w-[250px]">
               <img
                 src="/how-it-works/forecast.svg"
                 alt="Get forecast and heatwave alerts"
                 class="h-full w-full object-contain"
               />
             </div>
-            <h3 class="mt-4 text-xl font-bold lg:text-2xl">Get Forecast + Heatwave Alerts</h3>
-            <!-- <p class="mt-3 text-[18px]">
-              View current and forecast conditions, with clear warnings to prepare early before
-              extreme heat periods.
-            </p> -->
+            <h3 class="mt-4 text-xl font-bold lg:text-2xl">
+              Get Forecast + Heatwave Alerts
+            </h3>
           </article>
 
-          <!-- How it works: step 3 -->
-          <article class="text-center">
-            <div class="mx-auto h-[260px] w-full max-w-[320px]">
+          <article class="text-center md:translate-y-24 translate-x-[120px]">
+            <div class="mx-auto h-[220px] w-[220px] lg:h-[250px] lg:w-[250px]">
               <img
                 src="/how-it-works/awareness.svg"
                 alt="View energy demand and emissions awareness"
                 class="h-full w-full object-contain"
               />
             </div>
-            <h3 class="mt-4 text-xl font-bold lg:text-2xl">View Demand + Emissions Awareness</h3>
-            <!-- <p class="mt-3 text-[18px]">
-              Track Victoria-wide demand and emissions patterns, including peak periods, to support
-              smarter energy decisions.
-            </p> -->
+            <h3 class="mt-4 text-xl font-bold text-white lg:text-2xl">
+              View Demand + Emissions Awareness
+            </h3>
           </article>
         </div>
       </div>
@@ -343,7 +388,7 @@ onBeforeUnmount(() => {
 
     <!-- CTA section -->
     <section
-      class="relative w-full overflow-hidden py-20 lg:py-28 mt-[6rem]"
+      class="relative w-full overflow-hidden py-20 lg:py-45"
       style="
         background-image:
           linear-gradient(rgba(15, 23, 42, 0.5), rgba(15, 23, 42, 0.5)), url('/cta.jpg');

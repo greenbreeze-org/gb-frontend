@@ -123,6 +123,7 @@
   --gb-climate: #67e8f9;
   --gb-electric: #fbbf24;
   --gb-carbon: #cbd5e1;
+  --gb-secondary: #82d1c7;
 }
 
 @layer base {
@@ -133,13 +134,8 @@
     @apply bg-background text-foreground;
     font-family: 'Manrope', sans-serif;
   }
-  h1 {
+  h1,h2,h3 {
     color: var(--gb-grid);
-  }
-
-  h2,
-  h3 {
-    color: var(--gb-electric);
   }
 
   h1,
@@ -150,4 +146,44 @@
   h6 {
     font-family: 'Sora', sans-serif;
   }
+
+  p {
+  color: #6c6f75;
+}
+
+/* Windows laptop compatibility layer:
+   keeps Mac rendering unchanged while reducing oversized appearance/stretch on
+   low-DPR Windows displays (common 125% scaling scenarios). */
+@media (min-width: 1024px) {
+  html.platform-windows-lowdpr {
+    font-size: 15px;
+    zoom: 0.93;
+  }
+
+  html.platform-windows-lowdpr body {
+    overflow-x: hidden;
+  }
+
+  html.platform-windows-lowdpr .min-h-screen {
+    overflow-x: clip;
+  }
+
+  /* Keep animation/media blocks from stretching beyond wrappers when users
+     change browser zoom levels on Windows. */
+  html.platform-windows-lowdpr img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* Fallback for engines that don't apply `zoom` consistently. */
+@media (min-width: 1024px) {
+  @supports not (zoom: 1) {
+    html.platform-windows-lowdpr body {
+      transform: scale(0.93);
+      transform-origin: top left;
+      width: calc(100% / 0.93);
+    }
+  }
+}
 }

@@ -1,4 +1,4 @@
-// Base API URL: works with local dev and can be set to Render backend via env.
+// Base API URL from environment, falling back to relative /api/v1.
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? '/api/v1'
 
 // Build URL with query parameters.
