@@ -64,18 +64,6 @@ interface OpenMeteoForecastResponse {
   }
 }
 
-interface OpenMeteoGeocodeResponse {
-  results?: Array<{
-    latitude: number
-    longitude: number
-    name?: string
-    admin3?: string
-    admin4?: string
-    admin2?: string
-    admin1?: string
-  }>
-}
-
 interface ZippopotamPostcodeResponse {
   country?: string
   'country abbreviation'?: string
@@ -87,23 +75,6 @@ interface ZippopotamPostcodeResponse {
     state?: string
     'state abbreviation'?: string
   }>
-}
-
-const formatSuburbCity = (
-  name?: string,
-  admin4?: string,
-  admin3?: string,
-  admin2?: string,
-  admin1?: string,
-) => {
-  const suburb = admin4?.trim() || admin3?.trim() || name?.trim()
-  const city = admin2?.trim()
-  const state = admin1?.trim()
-
-  if (suburb && city) return `${suburb}, ${city}`
-  if (suburb && state) return `${suburb}, ${state}`
-  if (city && state) return `${city}, ${state}`
-  return suburb ?? city ?? state ?? 'Melbourne, VIC'
 }
 
 const round = (value: number) => Math.round(value * 10) / 10
@@ -193,28 +164,6 @@ const fetchCoordsForPostcode = async (postcode: string) => {
   }
 }
 
-const fetchLabelForCoords = async (lat: number, lon: number) => {
-  const reverseUrl = new URL('https://geocoding-api.open-meteo.com/v1/reverse')
-  reverseUrl.searchParams.set('latitude', String(lat))
-  reverseUrl.searchParams.set('longitude', String(lon))
-  reverseUrl.searchParams.set('count', '1')
-  reverseUrl.searchParams.set('language', 'en')
-  reverseUrl.searchParams.set('format', 'json')
-
-  const response = await fetch(reverseUrl.toString())
-  if (!response.ok) {
-    throw new Error('Reverse geocoding failed')
-  }
-
-  const data = (await response.json()) as OpenMeteoGeocodeResponse
-  const first = data.results?.[0]
-  if (!first) {
-    throw new Error('No reverse geocode result')
-  }
-
-  return formatSuburbCity(first.name, first.admin4, first.admin3, first.admin2, first.admin1)
-}
-
 const fetchFromOpenMeteo = async (params: {
   lat?: number
   lon?: number
@@ -236,11 +185,8 @@ const fetchFromOpenMeteo = async (params: {
     lon = 144.9631
     locationLabel = 'Melbourne, VIC'
   } else if (!params.postcode) {
-    try {
-      locationLabel = await fetchLabelForCoords(lat, lon)
-    } catch {
-      locationLabel = 'Melbourne, VIC'
-    }
+    // Avoid browser-side reverse geocoding calls that can fail due to CORS.
+    locationLabel = 'Melbourne, VIC'
   }
 
   const forecastUrl = new URL('https://api.open-meteo.com/v1/forecast')
@@ -269,7 +215,6 @@ const fetchFromOpenMeteo = async (params: {
   const hourlyTemps = data.hourly?.temperature_2m ?? []
   const hourlyCodes = data.hourly?.weather_code ?? []
   const hourlyIsDay = data.hourly?.is_day ?? []
-  const now = Date.now()
   const hourly = hourlyTimes
     .map((time, index) => {
       const ms = Date.parse(time)

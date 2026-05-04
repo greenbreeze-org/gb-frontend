@@ -30,6 +30,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { apiGet, apiPost } from '@/services/http'
 import { fetchForecastSnapshot, type ForecastSnapshot } from '@/services/forecast'
 
 ChartJS.register(
@@ -56,8 +57,26 @@ const locationCoords = ref<{ lat: number; lon: number } | null>(null)
 const weatherLoading = ref(false)
 const weatherError = ref('')
 const forecastSnapshot = ref<ForecastSnapshot | null>(null)
+const chartHourlyFromApi = ref<Array<{ time: string; tempC: number }>>([])
+const awsTodayMinMax = ref<{ minC: number; maxC: number } | null>(null)
 const HEATWAVE_THRESHOLD_C = 35
 const FORCE_NIGHT_VIDEO = false
+
+interface LocationResolveResponse {
+  lat: number
+  lon: number
+}
+
+interface ForecastWeatherResponse {
+  today?: {
+    minC?: number
+    maxC?: number
+  }
+  hourly?: Array<{
+    time?: string
+    tempC?: number
+  }>
+}
 
 const hasValidVicPostcode = computed(() => {
   const code = Number(postcode.value.trim())
@@ -354,8 +373,61 @@ const weeklyRows = computed(() => {
   })
 })
 
+const displayTodayMinC = computed(() => {
+  if (awsTodayMinMax.value) return awsTodayMinMax.value.minC
+  return forecastSnapshot.value?.todayMinC ?? 0
+})
+
+const displayTodayMaxC = computed(() => {
+  if (awsTodayMinMax.value) return awsTodayMinMax.value.maxC
+  return forecastSnapshot.value?.todayMaxC ?? 0
+})
+
+const fetchChartHourlyFromWeatherApi = async () => {
+  let lat = locationCoords.value?.lat
+  let lon = locationCoords.value?.lon
+
+  if ((lat === undefined || lon === undefined) && hasValidActiveFallbackPostcode.value) {
+    const resolved = await apiPost<LocationResolveResponse>('/location/resolve', {
+      postcode: activeFallbackPostcode.value.trim(),
+    })
+    lat = resolved.lat
+    lon = resolved.lon
+  }
+
+  if (lat === undefined || lon === undefined) {
+    awsTodayMinMax.value = null
+    chartHourlyFromApi.value = []
+    return
+  }
+
+  const response = await apiGet<ForecastWeatherResponse>('/forecast/weather', {
+    lat: String(lat),
+    lon: String(lon),
+  })
+
+  const minC = Number(response.today?.minC)
+  const maxC = Number(response.today?.maxC)
+  awsTodayMinMax.value =
+    Number.isFinite(minC) && Number.isFinite(maxC)
+      ? { minC, maxC }
+      : null
+
+  chartHourlyFromApi.value = (response.hourly ?? [])
+    .map((entry) => ({
+      time: entry.time ?? '',
+      tempC: Number(entry.tempC ?? 0),
+    }))
+    .filter((entry) => Boolean(entry.time) && Number.isFinite(entry.tempC))
+}
+
 const next12Hourly = computed(() => {
-  const source = forecastSnapshot.value?.hourly ?? []
+  const source = chartHourlyFromApi.value.map((entry) => ({
+    time: entry.time,
+    tempC: entry.tempC,
+    weatherCode: forecastSnapshot.value?.weatherCode ?? 0,
+    isDay: true,
+  }))
   if (!source.length) return []
 
   const now = new Date()
@@ -501,6 +573,12 @@ const loadForecastBlocks = async () => {
     })
 
     forecastSnapshot.value = snapshot
+    try {
+      await fetchChartHourlyFromWeatherApi()
+    } catch {
+      awsTodayMinMax.value = null
+      chartHourlyFromApi.value = []
+    }
   } catch {
     weatherError.value = 'Unable to load weather right now. Please try again.'
   } finally {
@@ -594,7 +672,7 @@ watch(
                 </p>
                 <p class="mt-1 text-xl text-white">{{ conditionLabel }}</p>
                 <p class="mt-1 text-sm text-white/80">
-                  Today: {{ forecastSnapshot?.todayMinC.toFixed(0) }}° / {{ forecastSnapshot?.todayMaxC.toFixed(0) }}°
+                  Today: {{ displayTodayMinC.toFixed(0) }}° / {{ displayTodayMaxC.toFixed(0) }}°
                 </p>
               </div>
             </CardContent>
@@ -609,7 +687,7 @@ watch(
                 <p class="text-sm font-bold text-white/85">Today</p>
                 <Thermometer class="mx-auto mt-1 h-5 w-5 text-white" />
                 <p class="mt-2 text-base font-bold text-white">
-                  {{ forecastSnapshot?.todayMaxC.toFixed(0) }}° / {{ forecastSnapshot?.todayMinC.toFixed(0) }}°
+                  {{ displayTodayMaxC.toFixed(0) }}° / {{ displayTodayMinC.toFixed(0) }}°
                 </p>
               </div>
               <div :class="glassTileClass" class="rounded-lg border px-3 py-3 text-center">
