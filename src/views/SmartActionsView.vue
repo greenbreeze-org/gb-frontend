@@ -103,7 +103,7 @@ const loadRecommendations = async () => {
   }
 
   const payload = mapToSmartActionsPayload(setup)
-  if (!payload.wall_type || payload.appliances.length === 0) {
+  if (!payload.wall_type || payload.appliances.length === 0 || !payload.postcode) {
     errorMessage.value = 'Profile setup is incomplete for Smart Actions.'
     return
   }
@@ -114,6 +114,7 @@ const loadRecommendations = async () => {
     const response = await fetchSmartActionsRecommendations({
       wall_type: payload.wall_type,
       appliances: payload.appliances,
+      postcode: payload.postcode,
     })
     apiResponse.value = response
     flippedCards.value = response.recommendations.map(() => false)

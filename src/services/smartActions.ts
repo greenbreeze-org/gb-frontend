@@ -36,6 +36,7 @@ export interface SmartActionsResponse {
 export interface SmartActionsPayload {
   wall_type: WallType
   appliances: ApplianceType[]
+  postcode: string
 }
 
 export const fetchSmartActionsRecommendations = async (

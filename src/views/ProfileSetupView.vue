@@ -9,8 +9,10 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  loadSharedLocationState,
   loadStoredProfileSetup,
   mapToSmartActionsPayload,
+  persistSharedLocationState,
   PROFILE_SETUP_STORAGE_KEY,
   SMART_ACTIONS_RESPONSE_KEY,
   SMART_ACTIONS_UNLOCKED_KEY,
@@ -24,6 +26,7 @@ const houseMaterial = ref('')
 const selectedDevices = ref<string[]>([])
 const submitLoading = ref(false)
 const submitError = ref('')
+const forcePostcodeInput = ref(false)
 
 const locationStatus = ref<'checking' | 'granted' | 'denied' | 'unavailable'>('checking')
 const locationCoords = ref<{ lat: number; lon: number } | null>(null)
@@ -129,15 +132,25 @@ const requestBrowserLocation = async () => {
       lon: position.coords.longitude,
     }
     locationStatus.value = 'granted'
+    persistSharedLocationState('granted', locationCoords.value)
   } catch {
     locationStatus.value = 'denied'
     locationCoords.value = null
+    persistSharedLocationState('denied', null)
   }
 }
 
 const checkBrowserLocationPermission = async () => {
+  const shared = loadSharedLocationState()
+  if (shared?.status === 'granted' && shared.coords) {
+    locationStatus.value = 'granted'
+    locationCoords.value = shared.coords
+    return
+  }
+
   if (!navigator.geolocation) {
     locationStatus.value = 'unavailable'
+    persistSharedLocationState('unavailable', null)
     return
   }
 
@@ -156,6 +169,7 @@ const checkBrowserLocationPermission = async () => {
 
     if (permission.state === 'denied') {
       locationStatus.value = 'denied'
+      persistSharedLocationState('denied', null)
       return
     }
 
@@ -163,6 +177,30 @@ const checkBrowserLocationPermission = async () => {
   } catch {
     await requestBrowserLocation()
   }
+}
+
+const resolvePostcodeFromCoords = async (coords: { lat: number; lon: number }) => {
+  const reverseUrl = new URL('https://nominatim.openstreetmap.org/reverse')
+  reverseUrl.searchParams.set('format', 'jsonv2')
+  reverseUrl.searchParams.set('lat', String(coords.lat))
+  reverseUrl.searchParams.set('lon', String(coords.lon))
+  reverseUrl.searchParams.set('zoom', '18')
+  reverseUrl.searchParams.set('addressdetails', '1')
+
+  const response = await fetch(reverseUrl.toString())
+  if (!response.ok) {
+    throw new Error('Unable to resolve postcode from current location')
+  }
+
+  const data = (await response.json()) as {
+    address?: { postcode?: string }
+  }
+  const rawPostcode = data.address?.postcode?.trim() ?? ''
+  const onlyDigits = rawPostcode.replace(/\D/g, '')
+  if (!/^\d{4}$/.test(onlyDigits)) {
+    throw new Error('Could not detect a valid VIC postcode from current location')
+  }
+  return onlyDigits
 }
 
 const toggleDevice = (value: string, checked: boolean) => {
@@ -183,6 +221,15 @@ const submitProfile = async () => {
   submitError.value = ''
 
   try {
+    if (!postcode.value.trim() && locationStatus.value === 'granted' && locationCoords.value) {
+      try {
+        postcode.value = await resolvePostcodeFromCoords(locationCoords.value)
+      } catch {
+        forcePostcodeInput.value = true
+        throw new Error('Please enter postcode manually before submitting.')
+      }
+    }
+
     persistSetupToSession()
     const setup = loadStoredProfileSetup()
     if (!setup) {
@@ -190,13 +237,14 @@ const submitProfile = async () => {
     }
 
     const payload = mapToSmartActionsPayload(setup)
-    if (!payload.wall_type || payload.appliances.length === 0) {
+    if (!payload.wall_type || payload.appliances.length === 0 || !payload.postcode) {
       throw new Error('Selected devices/material are not compatible with recommendations API')
     }
 
     const response = await fetchSmartActionsRecommendations({
       wall_type: payload.wall_type,
       appliances: payload.appliances,
+      postcode: payload.postcode,
     })
 
     sessionStorage.setItem(SMART_ACTIONS_RESPONSE_KEY, JSON.stringify(response))
@@ -216,6 +264,11 @@ const submitProfile = async () => {
 
 onMounted(async () => {
   restoreSetupFromSession()
+  const shared = loadSharedLocationState()
+  if (shared?.status === 'granted' && shared.coords) {
+    locationStatus.value = 'granted'
+    locationCoords.value = shared.coords
+  }
   await checkBrowserLocationPermission()
 })
 </script>
@@ -273,7 +326,7 @@ onMounted(async () => {
             </div>
 
             <div
-              v-if="locationStatus === 'denied' || locationStatus === 'unavailable'"
+              v-if="locationStatus === 'denied' || locationStatus === 'unavailable' || forcePostcodeInput"
               class="space-y-2"
             >
               <Label for="postcode" class="text-base font-semibold"
