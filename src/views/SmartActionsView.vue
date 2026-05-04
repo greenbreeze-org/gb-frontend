@@ -207,9 +207,17 @@ const onEstimateImpact = () => {
         </button>
 
  
-        <p v-if="showImpactSummary && !hasSelection" class="mt-3 text-sm font-medium text-amber-700">
-          No actions selected yet. Choose at least one completed action to calculate impact.
-        </p>
+        <div
+          v-if="showImpactSummary && !hasSelection"
+          class="mx-auto mt-4 w-full max-w-2xl rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-left"
+        >
+          <p class="text-sm font-semibold text-amber-700">
+            No actions selected yet. Choose at least one completed action to calculate impact.
+          </p>
+          <p class="mt-1 text-sm font-bold text-emerald-900">
+            Suggestion: Next time, pre-cool your living room 60–90 minutes before peak hours to reduce emissions and peak load.
+          </p>
+        </div>
       </section>
  
       <section v-if="showImpactSummary && hasSelection" class="mt-10 w-full">
