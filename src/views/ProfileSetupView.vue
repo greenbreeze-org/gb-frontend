@@ -1,17 +1,29 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 import SiteFooter from '@/components/layout/SiteFooter.vue'
 import SiteHeader from '@/components/layout/SiteHeader.vue'
+import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  loadStoredProfileSetup,
+  mapToSmartActionsPayload,
+  PROFILE_SETUP_STORAGE_KEY,
+  SMART_ACTIONS_RESPONSE_KEY,
+  SMART_ACTIONS_UNLOCKED_KEY,
+} from '@/services/profileSetup'
+import { fetchSmartActionsRecommendations } from '@/services/smartActions'
 
-const STORAGE_KEY = 'forecast_setup_v2'
+const router = useRouter()
 
 const postcode = ref('')
 const houseMaterial = ref('')
 const selectedDevices = ref<string[]>([])
+const submitLoading = ref(false)
+const submitError = ref('')
 
 const locationStatus = ref<'checking' | 'granted' | 'denied' | 'unavailable'>('checking')
 const locationCoords = ref<{ lat: number; lon: number } | null>(null)
@@ -67,7 +79,7 @@ const devicesError = computed(() =>
 )
 
 const restoreSetupFromSession = () => {
-  const raw = sessionStorage.getItem(STORAGE_KEY)
+  const raw = sessionStorage.getItem(PROFILE_SETUP_STORAGE_KEY)
   if (!raw) return
 
   try {
@@ -81,13 +93,13 @@ const restoreSetupFromSession = () => {
     houseMaterial.value = parsed.houseMaterial ?? ''
     selectedDevices.value = Array.isArray(parsed.selectedDevices) ? parsed.selectedDevices : []
   } catch {
-    sessionStorage.removeItem(STORAGE_KEY)
+    sessionStorage.removeItem(PROFILE_SETUP_STORAGE_KEY)
   }
 }
 
 const persistSetupToSession = () => {
   sessionStorage.setItem(
-    STORAGE_KEY,
+    PROFILE_SETUP_STORAGE_KEY,
     JSON.stringify({
       postcode: postcode.value,
       houseMaterial: houseMaterial.value,
@@ -162,6 +174,44 @@ const toggleDevice = (value: string, checked: boolean) => {
   }
 
   selectedDevices.value = selectedDevices.value.filter((item) => item !== value)
+}
+
+const submitProfile = async () => {
+  if (!setupReady.value) return
+
+  submitLoading.value = true
+  submitError.value = ''
+
+  try {
+    persistSetupToSession()
+    const setup = loadStoredProfileSetup()
+    if (!setup) {
+      throw new Error('Unable to read profile setup')
+    }
+
+    const payload = mapToSmartActionsPayload(setup)
+    if (!payload.wall_type || payload.appliances.length === 0) {
+      throw new Error('Selected devices/material are not compatible with recommendations API')
+    }
+
+    const response = await fetchSmartActionsRecommendations({
+      wall_type: payload.wall_type,
+      appliances: payload.appliances,
+    })
+
+    sessionStorage.setItem(SMART_ACTIONS_RESPONSE_KEY, JSON.stringify(response))
+    sessionStorage.setItem(SMART_ACTIONS_UNLOCKED_KEY, 'true')
+
+    await router.push('/smart-actions')
+  } catch (error) {
+    if (error instanceof Error) {
+      submitError.value = error.message
+    } else {
+      submitError.value = 'Unable to submit profile setup right now.'
+    }
+  } finally {
+    submitLoading.value = false
+  }
 }
 
 onMounted(async () => {
@@ -263,6 +313,18 @@ onMounted(async () => {
           <div v-else class="mt-6 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
             Please complete all setup fields to unlock full forecast insights.
           </div>
+
+          <div class="mt-6 flex items-center justify-center">
+            <Button
+              type="button"
+              class="h-11 bg-[var(--gb-electric)] px-8 text-white hover:bg-amber-300"
+              :disabled="!setupReady || submitLoading"
+              @click="submitProfile"
+            >
+              {{ submitLoading ? 'Submitting...' : 'Submit Profile Setup' }}
+            </Button>
+          </div>
+          <p v-if="submitError" class="mt-3 text-center text-sm font-semibold text-red-600">{{ submitError }}</p>
         </div>
       </section>
     </main>
