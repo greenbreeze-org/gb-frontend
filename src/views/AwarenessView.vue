@@ -52,6 +52,8 @@ const rangeParams = computed(() => {
     return {
       from: `${selectedDate.value}T00:00:00+10:00`,
       to: `${selectedDate.value}T23:59:59+10:00`,
+      granularity: 'hour' as const,
+      tz: 'Australia/Melbourne',
     }
   }
 
@@ -68,6 +70,8 @@ const rangeParams = computed(() => {
     return {
       from: `${monthStart}T00:00:00+10:00`,
       to: `${monthEnd}T23:59:59+10:00`,
+      granularity: 'day' as const,
+      tz: 'Australia/Melbourne',
     }
   }
 
@@ -80,12 +84,16 @@ const rangeParams = computed(() => {
     return {
       from: `${String(minYear).padStart(4, '0')}-01-01T00:00:00+10:00`,
       to: `${String(maxYear).padStart(4, '0')}-12-31T23:59:59+10:00`,
+      granularity: 'month' as const,
+      tz: 'Australia/Melbourne',
     }
   }
 
   return {
     from: withOffset(customFrom.value),
     to: withOffset(customTo.value),
+    granularity: 'hour' as const,
+    tz: 'Australia/Melbourne',
   }
 })
 
