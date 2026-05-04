@@ -169,9 +169,6 @@ const onEstimateImpact = () => {
         <p class="mx-auto mt-2 max-w-2xl text-sm text-slate-700">
           Select only the actions you completed today (choose any that apply).
         </p>
-        <p class="mx-auto mt-1 max-w-2xl text-xs text-slate-600">
-          You do not need to select everything. Multiple actions can be completed in one day.
-        </p>
  
         <div class="mx-auto mt-4 flex w-full max-w-2xl items-center justify-end gap-2">
           <button
@@ -208,10 +205,7 @@ const onEstimateImpact = () => {
         >
           Calculate My Impact
         </button>
- 
-        <p class="mt-2 text-xs text-slate-600">
-          Click whenever you update your selections.
-        </p>
+
  
         <p v-if="showImpactSummary && !hasSelection" class="mt-3 text-sm font-medium text-amber-700">
           No actions selected yet. Choose at least one completed action to calculate impact.
