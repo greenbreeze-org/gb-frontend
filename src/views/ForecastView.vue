@@ -32,6 +32,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { apiGet, apiPost } from '@/services/http'
 import { fetchForecastSnapshot, type ForecastSnapshot } from '@/services/forecast'
+import {
+  loadSharedLocationState,
+  persistSharedLocationState,
+} from '@/services/profileSetup'
 
 ChartJS.register(
   CategoryScale,
@@ -154,15 +158,25 @@ const requestBrowserLocation = async () => {
       lon: position.coords.longitude,
     }
     locationStatus.value = 'granted'
+    persistSharedLocationState('granted', locationCoords.value)
   } catch {
     locationStatus.value = 'denied'
     locationCoords.value = null
+    persistSharedLocationState('denied', null)
   }
 }
 
 const checkBrowserLocationPermission = async () => {
+  const shared = loadSharedLocationState()
+  if (shared?.status === 'granted' && shared.coords) {
+    locationStatus.value = 'granted'
+    locationCoords.value = shared.coords
+    return
+  }
+
   if (!navigator.geolocation) {
     locationStatus.value = 'unavailable'
+    persistSharedLocationState('unavailable', null)
     return
   }
 
@@ -181,6 +195,7 @@ const checkBrowserLocationPermission = async () => {
 
     if (permission.state === 'denied') {
       locationStatus.value = 'denied'
+      persistSharedLocationState('denied', null)
       return
     }
 
