@@ -24,8 +24,10 @@ const errorMessage = ref('')
 const showImpactSummary = ref(false)
 const apiResponse = ref<SmartActionsResponse | null>(null)
 const flippedCards = ref<boolean[]>([])
+const selectedActionItems = ref<string[]>([])
 
 const isUnlocked = computed(() => sessionStorage.getItem(SMART_ACTIONS_UNLOCKED_KEY) === 'true')
+const hasSelection = computed(() => selectedActionItems.value.length > 0)
 
 const colorClass = (color: SmartActionRecommendation['color']) => {
   if (color === 'RED') return 'border-red-300 bg-red-50 text-red-800'
@@ -66,6 +68,17 @@ const impactSummary = computed(() => {
 
 const toggleCardFlip = (index: number) => {
   flippedCards.value[index] = !flippedCards.value[index]
+}
+
+const toggleActionItem = (item: string, checked: boolean) => {
+  if (checked) {
+    if (!selectedActionItems.value.includes(item)) {
+      selectedActionItems.value.push(item)
+    }
+    return
+  }
+
+  selectedActionItems.value = selectedActionItems.value.filter((v) => v !== item)
 }
 
 const loadRecommendations = async () => {
@@ -191,7 +204,10 @@ onMounted(async () => {
               :key="item"
               class="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3"
             >
-              <Checkbox />
+              <Checkbox
+                :model-value="selectedActionItems.includes(item)"
+                @update:model-value="(checked) => toggleActionItem(item, Boolean(checked))"
+              />
               <span class="text-sm font-medium text-slate-800">{{ item }}</span>
             </label>
           </div>
@@ -202,9 +218,21 @@ onMounted(async () => {
           >
             Estimate Impact
           </button>
+
+          <div
+            v-if="showImpactSummary && !hasSelection"
+            class="mx-auto mt-4 w-full max-w-2xl rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-left"
+          >
+            <p class="text-sm font-semibold text-amber-700">
+              No actions selected yet. Choose at least one completed action to calculate impact.
+            </p>
+            <p class="mt-1 text-sm font-bold text-emerald-900">
+              Suggestion: Next time, pre-cool your living room 60-90 minutes before peak hours to reduce emissions and peak load.
+            </p>
+          </div>
         </section>
 
-        <section v-if="apiResponse && showImpactSummary" class="mt-10 w-full">
+        <section v-if="apiResponse && showImpactSummary && hasSelection" class="mt-10 w-full">
           <h2 class="text-2xl font-bold">Impact Summary</h2>
           <div class="mx-auto mt-4 grid w-full max-w-3xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card
