@@ -125,7 +125,7 @@ const onEstimateImpact = () => {
                   <div class="mt-auto flex justify-end">
                     <button
                       type="button"
-                      class="text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-800"
+                      class="cursor-pointer text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-800"
                       @click.stop="toggleCardFlip(index)"
                     >
                       Learn more
@@ -151,7 +151,7 @@ const onEstimateImpact = () => {
                   <div class="mt-auto flex justify-end">
                     <button
                       type="button"
-                      class="text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-800"
+                      class="cursor-pointer text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-800"
                       @click.stop="toggleCardFlip(index)"
                     >
                       Go back
