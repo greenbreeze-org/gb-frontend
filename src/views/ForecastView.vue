@@ -58,6 +58,7 @@ const weatherLoading = ref(false)
 const weatherError = ref('')
 const forecastSnapshot = ref<ForecastSnapshot | null>(null)
 const chartHourlyFromApi = ref<Array<{ time: string; tempC: number }>>([])
+const awsTodayMinMax = ref<{ minC: number; maxC: number } | null>(null)
 const HEATWAVE_THRESHOLD_C = 35
 const FORCE_NIGHT_VIDEO = false
 
@@ -67,6 +68,10 @@ interface LocationResolveResponse {
 }
 
 interface ForecastWeatherResponse {
+  today?: {
+    minC?: number
+    maxC?: number
+  }
   hourly?: Array<{
     time?: string
     tempC?: number
@@ -368,6 +373,16 @@ const weeklyRows = computed(() => {
   })
 })
 
+const displayTodayMinC = computed(() => {
+  if (awsTodayMinMax.value) return awsTodayMinMax.value.minC
+  return forecastSnapshot.value?.todayMinC ?? 0
+})
+
+const displayTodayMaxC = computed(() => {
+  if (awsTodayMinMax.value) return awsTodayMinMax.value.maxC
+  return forecastSnapshot.value?.todayMaxC ?? 0
+})
+
 const fetchChartHourlyFromWeatherApi = async () => {
   let lat = locationCoords.value?.lat
   let lon = locationCoords.value?.lon
@@ -381,6 +396,7 @@ const fetchChartHourlyFromWeatherApi = async () => {
   }
 
   if (lat === undefined || lon === undefined) {
+    awsTodayMinMax.value = null
     chartHourlyFromApi.value = []
     return
   }
@@ -389,6 +405,13 @@ const fetchChartHourlyFromWeatherApi = async () => {
     lat: String(lat),
     lon: String(lon),
   })
+
+  const minC = Number(response.today?.minC)
+  const maxC = Number(response.today?.maxC)
+  awsTodayMinMax.value =
+    Number.isFinite(minC) && Number.isFinite(maxC)
+      ? { minC, maxC }
+      : null
 
   chartHourlyFromApi.value = (response.hourly ?? [])
     .map((entry) => ({
@@ -399,15 +422,12 @@ const fetchChartHourlyFromWeatherApi = async () => {
 }
 
 const next12Hourly = computed(() => {
-  const source =
-    chartHourlyFromApi.value.length > 0
-      ? chartHourlyFromApi.value.map((entry) => ({
-          time: entry.time,
-          tempC: entry.tempC,
-          weatherCode: forecastSnapshot.value?.weatherCode ?? 0,
-          isDay: true,
-        }))
-      : (forecastSnapshot.value?.hourly ?? [])
+  const source = chartHourlyFromApi.value.map((entry) => ({
+    time: entry.time,
+    tempC: entry.tempC,
+    weatherCode: forecastSnapshot.value?.weatherCode ?? 0,
+    isDay: true,
+  }))
   if (!source.length) return []
 
   const now = new Date()
@@ -556,6 +576,7 @@ const loadForecastBlocks = async () => {
     try {
       await fetchChartHourlyFromWeatherApi()
     } catch {
+      awsTodayMinMax.value = null
       chartHourlyFromApi.value = []
     }
   } catch {
@@ -651,7 +672,7 @@ watch(
                 </p>
                 <p class="mt-1 text-xl text-white">{{ conditionLabel }}</p>
                 <p class="mt-1 text-sm text-white/80">
-                  Today: {{ forecastSnapshot?.todayMinC.toFixed(0) }}° / {{ forecastSnapshot?.todayMaxC.toFixed(0) }}°
+                  Today: {{ displayTodayMinC.toFixed(0) }}° / {{ displayTodayMaxC.toFixed(0) }}°
                 </p>
               </div>
             </CardContent>
@@ -666,7 +687,7 @@ watch(
                 <p class="text-sm font-bold text-white/85">Today</p>
                 <Thermometer class="mx-auto mt-1 h-5 w-5 text-white" />
                 <p class="mt-2 text-base font-bold text-white">
-                  {{ forecastSnapshot?.todayMaxC.toFixed(0) }}° / {{ forecastSnapshot?.todayMinC.toFixed(0) }}°
+                  {{ displayTodayMaxC.toFixed(0) }}° / {{ displayTodayMinC.toFixed(0) }}°
                 </p>
               </div>
               <div :class="glassTileClass" class="rounded-lg border px-3 py-3 text-center">
