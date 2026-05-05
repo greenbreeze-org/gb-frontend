@@ -46,14 +46,34 @@ const recommendationTitle = (rec: SmartActionRecommendation) => {
   return rec.short_reason?.trim() || rec.appliance.replaceAll('_', ' ')
 }
 
+const recommendationFingerprint = (rec: SmartActionRecommendation) => {
+  return recommendationTitle(rec).toLowerCase()
+}
+
+const dedupedRecommendations = computed(() => {
+  const seen = new Set<string>()
+  const unique: SmartActionRecommendation[] = []
+
+  for (const rec of apiResponse.value?.recommendations ?? []) {
+    const key = recommendationFingerprint(rec)
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(rec)
+  }
+
+  return unique
+})
+
 const actionItems = computed(() =>
-  (apiResponse.value?.recommendations ?? []).map((rec) => recommendationTitle(rec)),
+  dedupedRecommendations.value.map((rec) => ({
+    id: rec.id,
+    title: recommendationTitle(rec),
+  })),
 )
 
 const impactSummary = computed(() => {
-  const recommendations = apiResponse.value?.recommendations ?? []
-  const selectedRecommendations = recommendations.filter((rec) =>
-    selectedActionItems.value.includes(recommendationTitle(rec)),
+  const selectedRecommendations = dedupedRecommendations.value.filter((rec) =>
+    selectedActionItems.value.includes(rec.id),
   )
 
   const totalKwh = selectedRecommendations.reduce(
@@ -81,19 +101,19 @@ const toggleCardFlip = (index: number) => {
   flippedCards.value[index] = !flippedCards.value[index]
 }
 
-const toggleActionItem = (item: string, checked: boolean) => {
+const toggleActionItem = (itemId: string, checked: boolean) => {
   if (checked) {
-    if (!selectedActionItems.value.includes(item)) {
-      selectedActionItems.value.push(item)
+    if (!selectedActionItems.value.includes(itemId)) {
+      selectedActionItems.value.push(itemId)
     }
     return
   }
 
-  selectedActionItems.value = selectedActionItems.value.filter((v) => v !== item)
+  selectedActionItems.value = selectedActionItems.value.filter((v) => v !== itemId)
 }
 
 const selectAllActions = () => {
-  selectedActionItems.value = [...actionItems.value]
+  selectedActionItems.value = actionItems.value.map((item) => item.id)
 }
 
 const clearAllActions = () => {
@@ -109,7 +129,10 @@ const loadRecommendations = async () => {
     try {
       const parsed = JSON.parse(cached) as SmartActionsResponse
       apiResponse.value = parsed
-      flippedCards.value = parsed.recommendations.map(() => false)
+      flippedCards.value = dedupedRecommendations.value.map(() => false)
+      selectedActionItems.value = selectedActionItems.value.filter((id) =>
+        dedupedRecommendations.value.some((rec) => rec.id === id),
+      )
       return
     } catch {
       sessionStorage.removeItem(SMART_ACTIONS_RESPONSE_KEY)
@@ -137,7 +160,10 @@ const loadRecommendations = async () => {
       postcode: payload.postcode,
     })
     apiResponse.value = response
-    flippedCards.value = response.recommendations.map(() => false)
+    flippedCards.value = dedupedRecommendations.value.map(() => false)
+    selectedActionItems.value = selectedActionItems.value.filter((id) =>
+      dedupedRecommendations.value.some((rec) => rec.id === id),
+    )
     sessionStorage.setItem(SMART_ACTIONS_RESPONSE_KEY, JSON.stringify(response))
   } catch {
     errorMessage.value = 'Unable to load smart actions recommendations right now.'
@@ -184,7 +210,7 @@ onMounted(async () => {
 
           <div class="mt-5 grid gap-4 md:grid-cols-2">
             <div
-              v-for="(card, index) in apiResponse.recommendations"
+              v-for="(card, index) in dedupedRecommendations"
               :key="card.id"
               class="flip-card h-52 w-full text-left"
             >
@@ -270,14 +296,14 @@ onMounted(async () => {
           <div class="mx-auto mt-3 flex w-full max-w-2xl flex-col gap-3 text-left">
             <label
               v-for="item in actionItems"
-              :key="item"
+              :key="item.id"
               class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3"
             >
               <Checkbox
-                :model-value="selectedActionItems.includes(item)"
-                @update:model-value="(checked) => toggleActionItem(item, Boolean(checked))"
+                :model-value="selectedActionItems.includes(item.id)"
+                @update:model-value="(checked) => toggleActionItem(item.id, Boolean(checked))"
               />
-              <span class="text-sm font-medium text-slate-800">{{ item }}</span>
+              <span class="text-sm font-medium text-slate-800">{{ item.title }}</span>
             </label>
           </div>
 
@@ -320,6 +346,10 @@ onMounted(async () => {
               </CardContent>
             </Card>
           </div>
+
+          <p class="mx-auto mt-5 max-w-3xl rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
+            Great job. Your selected actions are helping reduce grid stress and supporting a more reliable, lower-emission energy system.
+          </p>
         </section>
       </template>
     </main>
