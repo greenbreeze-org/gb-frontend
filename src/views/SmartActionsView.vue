@@ -346,6 +346,10 @@ onMounted(async () => {
               </CardContent>
             </Card>
           </div>
+
+          <p class="mx-auto mt-5 max-w-3xl rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
+            Great job. Your selected actions are helping reduce grid stress and supporting a more reliable, lower-emission energy system.
+          </p>
         </section>
       </template>
     </main>
