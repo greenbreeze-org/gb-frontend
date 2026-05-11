@@ -37,10 +37,13 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Add iteration1 snapshot
+      - name: Add iteration snapshots
         run: |
           mkdir -p dist/iteration1
           cp -R iteration1/* dist/iteration1/
+
+          mkdir -p dist/iteration2
+          cp -R iteration2/* dist/iteration2/
 
       - name: Debug dist size
         run: |
