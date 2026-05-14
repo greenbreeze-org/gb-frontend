@@ -195,7 +195,7 @@ onMounted(async () => {
           <p class="text-sm text-amber-800">
             You need to complete and submit your profile setup before Smart Actions can be generated.
           </p>
-          <Button as-child class="mt-5 bg-[var(--gb-electric)] text-white hover:bg-amber-300">
+          <Button as-child class="mt-5 bg-[var(--gb-electric)] text-white hover:bg-[#4CBB17] hover:text-white">
             <RouterLink to="/profile-setup">Go to Profile Setup</RouterLink>
           </Button>
         </CardContent>
@@ -309,7 +309,7 @@ onMounted(async () => {
 
           <button
             type="button"
-            class="mt-5 rounded-lg bg-[var(--gb-electric)] px-6 py-2 text-sm font-bold text-white hover:bg-amber-300"
+            class="mt-5 rounded-lg bg-[var(--gb-electric)] px-6 py-2 text-sm font-bold text-white hover:bg-[#4CBB17] hover:text-white"
             @click="showImpactSummary = true"
           >
             Estimate Impact

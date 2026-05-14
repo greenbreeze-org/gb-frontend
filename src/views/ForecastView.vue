@@ -826,7 +826,7 @@ watch(
               placeholder="3000"
               class="mt-1.5 h-10 bg-white px-3 text-sm"
             />
-            <Button type="submit" class="mt-2 h-10 w-full bg-[var(--gb-electric)] px-3 text-sm font-bold text-white hover:bg-amber-300">
+            <Button type="submit" class="mt-2 h-10 w-full bg-[var(--gb-electric)] px-3 text-sm font-bold text-white hover:bg-[#4CBB17] hover:text-white">
               Enter
             </Button>
           </form>
@@ -866,7 +866,7 @@ watch(
           </div>
           <RouterLink
             to="/smart-actions"
-            class="block rounded-xl py-3 text-center text-sm font-bold text-white bg-[var(--gb-electric)] px-8 hover:bg-amber-300"
+            class="block rounded-xl bg-[var(--gb-electric)] px-8 py-3 text-center text-sm font-bold text-white hover:bg-[#4CBB17] hover:text-white"
           >
             Go To Smart Actions
           </RouterLink>

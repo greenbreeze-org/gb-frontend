@@ -12,7 +12,7 @@ const route = useRoute()
 // Navbar tabs
 const tabs = [
   { label: 'Home', to: '/', icon: Home },
-  { label: 'Forecast', to: '/forecast', icon: LineChart },
+  { label: 'Predictive Analysis', to: '/forecast', icon: LineChart },
   { label: 'Smart Actions', to: '/smart-actions', icon: Lightbulb },
   { label: 'Awareness', to: '/awareness', icon: Leaf },
 ]

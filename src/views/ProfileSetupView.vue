@@ -370,7 +370,7 @@ onMounted(async () => {
           <div class="mt-6 flex items-center justify-center">
             <Button
               type="button"
-              class="h-11 bg-[var(--gb-electric)] px-8 text-white hover:bg-amber-300"
+              class="h-11 bg-[var(--gb-electric)] px-8 text-white hover:bg-[#4CBB17] hover:text-white"
               :disabled="!setupReady || submitLoading"
               @click="submitProfile"
             >

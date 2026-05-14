@@ -428,7 +428,7 @@ onMounted(async () => {
 
         <Button
           type="button"
-          class="h-10 bg-[var(--gb-electric)] px-5 text-white hover:bg-amber-300"
+          class="h-10 bg-[var(--gb-electric)] px-5 text-white hover:bg-[#4CBB17] hover:text-white"
           :disabled="loading"
           @click="loadAwarenessData"
         >
