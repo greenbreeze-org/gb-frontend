@@ -1,15 +1,34 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { Line } from 'vue-chartjs'
+import annotationPlugin from 'chartjs-plugin-annotation'
+import {
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  Legend,
+  LineElement,
+  LinearScale,
+  PointElement,
+  Tooltip,
+  type ChartData,
+  type ChartOptions,
+} from 'chart.js'
+import { Droplets, Sun, Thermometer, Wind } from 'lucide-vue-next'
 
 import SiteFooter from '@/components/layout/SiteFooter.vue'
 import SiteHeader from '@/components/layout/SiteHeader.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { apiGet, apiPost } from '@/services/http'
+import { fetchForecastSnapshot, type ForecastSnapshot } from '@/services/forecast'
 import {
+  loadSharedLocationState,
   loadStoredProfileSetup,
   mapToSmartActionsPayload,
+  persistSharedLocationState,
   SMART_ACTIONS_RESPONSE_KEY,
   SMART_ACTIONS_UNLOCKED_KEY,
 } from '@/services/profileSetup'
@@ -19,6 +38,17 @@ import {
   type SmartActionsResponse,
 } from '@/services/smartActions'
 
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
+  Filler,
+  annotationPlugin,
+)
+
 const loading = ref(false)
 const errorMessage = ref('')
 const showImpactSummary = ref(false)
@@ -26,9 +56,51 @@ const apiResponse = ref<SmartActionsResponse | null>(null)
 const flippedCards = ref<boolean[]>([])
 const selectedActionItems = ref<string[]>([])
 
+const locationStatus = ref<'checking' | 'granted' | 'denied' | 'unavailable'>('checking')
+const locationCoords = ref<{ lat: number; lon: number } | null>(null)
+const activeFallbackPostcode = ref('3000')
+const forecastSnapshot = ref<ForecastSnapshot | null>(null)
+const heroLoading = ref(true)
+const chartHourlyFromApi = ref<Array<{ time: string; tempC: number }>>([])
+const awsTodayMinMax = ref<{ minC: number; maxC: number } | null>(null)
+const HEATWAVE_THRESHOLD_C = 35
+const FORCE_NIGHT_VIDEO = false
+
+interface LocationResolveResponse {
+  lat: number
+  lon: number
+}
+
+interface ForecastWeatherResponse {
+  today?: {
+    minC?: number
+    maxC?: number
+  }
+  hourly?: Array<{
+    time?: string
+    tempC?: number
+  }>
+}
+
 const isUnlocked = computed(() => sessionStorage.getItem(SMART_ACTIONS_UNLOCKED_KEY) === 'true')
 const hasSelection = computed(() => selectedActionItems.value.length > 0)
 const selectedCount = computed(() => selectedActionItems.value.length)
+
+const hasBrowserLocation = computed(() => Boolean(locationCoords.value))
+const hasValidActiveFallbackPostcode = computed(() => {
+  const code = Number(activeFallbackPostcode.value.trim())
+  if (Number.isNaN(code)) return false
+  return (code >= 3000 && code <= 3999) || (code >= 8000 && code <= 8999)
+})
+
+const setupReady = computed(() => {
+  const usingBrowserLocation = locationStatus.value === 'granted' && hasBrowserLocation.value
+  const usingPostcode =
+    (locationStatus.value === 'denied' || locationStatus.value === 'unavailable') &&
+    hasValidActiveFallbackPostcode.value
+
+  return usingBrowserLocation || usingPostcode
+})
 
 const colorClass = (color: SmartActionRecommendation['color']) => {
   if (color === 'RED') return 'border-red-300 bg-red-50 text-red-800'
@@ -96,6 +168,399 @@ const impactSummary = computed(() => {
     { value: `${selectedRecommendations.length}`, label: 'Recommendations completed' },
   ]
 })
+
+const requestBrowserLocation = async () => {
+  if (!navigator.geolocation) {
+    locationStatus.value = 'unavailable'
+    return
+  }
+
+  try {
+    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 8000,
+      })
+    })
+
+    locationCoords.value = {
+      lat: position.coords.latitude,
+      lon: position.coords.longitude,
+    }
+    locationStatus.value = 'granted'
+    persistSharedLocationState('granted', locationCoords.value)
+  } catch {
+    locationStatus.value = 'denied'
+    locationCoords.value = null
+    persistSharedLocationState('denied', null)
+  }
+}
+
+const checkBrowserLocationPermission = async () => {
+  const shared = loadSharedLocationState()
+  if (shared?.status === 'granted' && shared.coords) {
+    locationStatus.value = 'granted'
+    locationCoords.value = shared.coords
+    return
+  }
+
+  if (!navigator.geolocation) {
+    locationStatus.value = 'unavailable'
+    persistSharedLocationState('unavailable', null)
+    return
+  }
+
+  if (!('permissions' in navigator)) {
+    await requestBrowserLocation()
+    return
+  }
+
+  try {
+    const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName })
+
+    if (permission.state === 'granted') {
+      await requestBrowserLocation()
+      return
+    }
+
+    if (permission.state === 'denied') {
+      locationStatus.value = 'denied'
+      persistSharedLocationState('denied', null)
+      return
+    }
+
+    await requestBrowserLocation()
+  } catch {
+    await requestBrowserLocation()
+  }
+}
+
+const tomorrowDateLabel = computed(() => {
+  if (!forecastSnapshot.value?.tomorrowDate) return ''
+
+  const date = new Date(forecastSnapshot.value.tomorrowDate)
+  if (Number.isNaN(date.getTime())) return forecastSnapshot.value.tomorrowDate
+
+  return date.toLocaleDateString('en-AU', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+})
+
+const isHeatwaveTomorrow = computed(
+  () => (forecastSnapshot.value?.tomorrowMaxC ?? 0) >= HEATWAVE_THRESHOLD_C,
+)
+
+const weatherCodeToLabel = (code: number, isDay: boolean) => {
+  if (code === 0) return isDay ? 'Clear Sky' : 'Clear Night'
+  if (code === 1) return isDay ? 'Mainly Sunny' : 'Mainly Clear'
+  if (code === 2) return 'Partly Cloudy'
+  if (code === 3) return 'Overcast'
+  if ([45, 48].includes(code)) return 'Foggy'
+  if ([51, 53, 55, 56, 57].includes(code)) return 'Drizzle'
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return 'Rain Showers'
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'Snow'
+  if ([95, 96, 99].includes(code)) return 'Thunderstorm'
+  return 'Weather'
+}
+
+const moodKey = computed(() => {
+  if (FORCE_NIGHT_VIDEO) return 'cloud'
+
+  const code = forecastSnapshot.value?.weatherCode ?? 1
+  const isDay = forecastSnapshot.value?.isDay ?? true
+
+  if ([95, 96, 99].includes(code)) return 'storm'
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return 'rain'
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'snow'
+  if (!isDay) return 'night'
+  if ([45, 48].includes(code)) return 'fog'
+  if ([2, 3].includes(code)) return 'cloud'
+  return 'sun'
+})
+
+const moodVideoSrc = computed(() => {
+  switch (moodKey.value) {
+    case 'storm':
+      return '/weather-bg/storm.mp4'
+    case 'rain':
+      return '/weather-bg/rain.mp4'
+    case 'snow':
+      return '/weather-bg/cloud.mp4'
+    case 'night':
+      return '/weather-bg/night.mp4'
+    case 'fog':
+      return '/weather-bg/cloud.mp4'
+    case 'cloud':
+      return '/weather-bg/cloud.mp4'
+    default:
+      return '/weather-bg/sun.mp4'
+  }
+})
+
+const dashboardToneClass = computed(() => {
+  switch (moodKey.value) {
+    case 'storm':
+      return 'from-slate-950/40 via-indigo-900/35 to-slate-900/50'
+    case 'rain':
+      return 'from-slate-900/30 via-sky-900/30 to-slate-900/45'
+    case 'snow':
+      return 'from-slate-900/20 via-sky-900/24 to-slate-800/35'
+    case 'night':
+      return 'from-indigo-950/45 via-slate-900/40 to-slate-900/50'
+    case 'fog':
+      return 'from-slate-800/22 via-slate-700/26 to-slate-800/35'
+    case 'cloud':
+      return 'from-slate-800/24 via-slate-700/30 to-slate-800/38'
+    default:
+      return 'from-amber-700/24 via-sky-700/26 to-emerald-900/32'
+  }
+})
+
+const glassCardClass = 'bg-black/22 border-white/18 shadow-[0_12px_22px_rgba(15,23,42,0.22)]'
+const glassTileClass = 'bg-black/20 border-white/16 shadow-[0_6px_12px_rgba(15,23,42,0.16)]'
+
+const uvValue = computed(() => {
+  return Math.max(0, Math.min(11, forecastSnapshot.value?.uvIndex ?? 0))
+})
+
+const uvLabel = computed(() => {
+  const uv = uvValue.value
+  if (uv < 3) return 'Low'
+  if (uv < 6) return 'Moderate'
+  if (uv < 8) return 'High'
+  if (uv < 11) return 'Very High'
+  return 'Extreme'
+})
+
+const uvIndicatorClass = computed(() => {
+  const uv = uvValue.value
+  if (uv < 3) return 'text-emerald-400'
+  if (uv < 6) return 'text-yellow-400'
+  if (uv < 8) return 'text-orange-400'
+  if (uv < 11) return 'text-rose-400'
+  return 'text-fuchsia-400'
+})
+
+const uvRing = computed(() => {
+  const radius = 30
+  const circumference = 2 * Math.PI * radius
+  const clamped = Math.max(0, Math.min(11, uvValue.value))
+  const progress = clamped / 11
+  const dashOffset = circumference * (1 - progress)
+
+  return { radius, circumference, dashOffset }
+})
+
+const conditionLabel = computed(() => {
+  if (!forecastSnapshot.value) return 'Weather'
+  if (isHeatwaveTomorrow.value && [95, 96, 99].includes(forecastSnapshot.value.weatherCode)) {
+    return 'Severe Heat + Storm Risk'
+  }
+  return weatherCodeToLabel(forecastSnapshot.value.weatherCode, forecastSnapshot.value.isDay)
+})
+
+const displayTodayMinC = computed(() => {
+  if (awsTodayMinMax.value) return awsTodayMinMax.value.minC
+  return forecastSnapshot.value?.todayMinC ?? 0
+})
+
+const displayTodayMaxC = computed(() => {
+  if (awsTodayMinMax.value) return awsTodayMinMax.value.maxC
+  return forecastSnapshot.value?.todayMaxC ?? 0
+})
+
+const displayHumidityPct = computed(() => forecastSnapshot.value?.humidityPct ?? 0)
+const displayWindKph = computed(() => Math.round(forecastSnapshot.value?.windKph ?? 0))
+
+const fetchChartHourlyFromWeatherApi = async () => {
+  let lat = locationCoords.value?.lat
+  let lon = locationCoords.value?.lon
+
+  if ((lat === undefined || lon === undefined) && hasValidActiveFallbackPostcode.value) {
+    const resolved = await apiPost<LocationResolveResponse>('/location/resolve', {
+      postcode: activeFallbackPostcode.value.trim(),
+    })
+    lat = resolved.lat
+    lon = resolved.lon
+  }
+
+  if (lat === undefined || lon === undefined) {
+    awsTodayMinMax.value = null
+    chartHourlyFromApi.value = []
+    return
+  }
+
+  const response = await apiGet<ForecastWeatherResponse>('/forecast/weather', {
+    lat: String(lat),
+    lon: String(lon),
+  })
+
+  const minC = Number(response.today?.minC)
+  const maxC = Number(response.today?.maxC)
+  awsTodayMinMax.value = Number.isFinite(minC) && Number.isFinite(maxC) ? { minC, maxC } : null
+
+  chartHourlyFromApi.value = (response.hourly ?? [])
+    .map((entry) => ({
+      time: entry.time ?? '',
+      tempC: Number(entry.tempC ?? 0),
+    }))
+    .filter((entry) => Boolean(entry.time) && Number.isFinite(entry.tempC))
+}
+
+const next12Hourly = computed(() => {
+  const source = chartHourlyFromApi.value.map((entry) => ({
+    time: entry.time,
+    tempC: entry.tempC,
+  }))
+  if (!source.length) return []
+
+  const now = new Date()
+  now.setMinutes(0, 0, 0)
+  const startMs = now.getTime()
+
+  const startIndex = source.findIndex((h) => {
+    const ms = new Date(h.time).getTime()
+    return !Number.isNaN(ms) && ms >= startMs
+  })
+
+  if (startIndex === -1) return source.slice(0, 12)
+  return source.slice(startIndex, startIndex + 12)
+})
+
+const hourlyLabels = computed(() =>
+  next12Hourly.value.map((h) => {
+    const date = new Date(h.time)
+    if (Number.isNaN(date.getTime())) return '--:--'
+    return date.toLocaleTimeString('en-AU', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Australia/Melbourne',
+    })
+  }),
+)
+
+const hourlyTemps = computed(() => next12Hourly.value.map((h) => Math.round(h.tempC)))
+const midnightLabelIndex = computed(() => hourlyLabels.value.findIndex((label) => label === '00:00'))
+
+const hourlyChartData = computed<ChartData<'line'>>(() => ({
+  labels: hourlyLabels.value,
+  datasets: [
+    {
+      data: hourlyTemps.value,
+      borderColor: 'rgba(251,191,36,1)',
+      borderWidth: 3,
+      pointRadius: 4,
+      pointHoverRadius: 4,
+      pointBackgroundColor: 'rgba(255,255,255,0.95)',
+      pointBorderColor: 'rgba(255,255,255,0.95)',
+      tension: 0.35,
+      fill: true,
+      backgroundColor: (ctx) => {
+        const { chart } = ctx
+        const area = chart.chartArea
+        if (!area) return 'rgba(250,204,21,0.35)'
+        const gradient = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom)
+        gradient.addColorStop(0, 'rgba(250,204,21,0.62)')
+        gradient.addColorStop(1, 'rgba(251,146,60,0.14)')
+        return gradient
+      },
+    },
+  ],
+}))
+
+const hourlyChartOptions = computed<ChartOptions<'line'>>(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: (ctx) => `${ctx.parsed.y}°C`,
+      },
+    },
+    annotation: {
+      annotations:
+        midnightLabelIndex.value >= 0
+          ? {
+              midnightLine: {
+                type: 'line',
+                xMin: midnightLabelIndex.value,
+                xMax: midnightLabelIndex.value,
+                borderColor: 'rgba(255,255,255,0.4)',
+                borderWidth: 1,
+                borderDash: [6, 6],
+                label: {
+                  display: true,
+                  content: 'MIDNIGHT',
+                  position: 'end',
+                  backgroundColor: 'rgba(0,0,0,0)',
+                  color: 'rgba(255,255,255,0.85)',
+                  yAdjust: -6,
+                  font: { weight: 'bold' },
+                },
+              },
+            }
+          : {},
+    },
+  },
+  scales: {
+    x: {
+      grid: { display: false },
+      border: { display: false },
+      ticks: {
+        color: 'rgba(255,255,255,0.78)',
+        maxRotation: 0,
+        autoSkip: true,
+        maxTicksLimit: 7,
+      },
+    },
+    y: {
+      beginAtZero: false,
+      grid: { color: 'rgba(255,255,255,0.14)' },
+      border: { display: false },
+      ticks: {
+        color: 'rgba(255,255,255,0.82)',
+        callback: (value) => `${value}°`,
+      },
+    },
+  },
+}))
+
+const loadForecastBlocks = async () => {
+  if (!setupReady.value) {
+    forecastSnapshot.value = null
+    heroLoading.value = false
+    return
+  }
+
+  try {
+    const fallbackPostcode =
+      locationStatus.value === 'denied' || locationStatus.value === 'unavailable'
+        ? activeFallbackPostcode.value.trim()
+        : undefined
+
+    const snapshot = await fetchForecastSnapshot({
+      lat: locationCoords.value?.lat,
+      lon: locationCoords.value?.lon,
+      postcode: fallbackPostcode,
+    })
+
+    forecastSnapshot.value = snapshot
+    await fetchChartHourlyFromWeatherApi()
+  } catch {
+    forecastSnapshot.value = null
+  } finally {
+    heroLoading.value = false
+  }
+}
+
+const scrollToActionFlow = () => {
+  const section = document.getElementById('smart-actions-flow')
+  section?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 const toggleCardFlip = (index: number) => {
   flippedCards.value[index] = !flippedCards.value[index]
@@ -173,16 +638,209 @@ const loadRecommendations = async () => {
 }
 
 onMounted(async () => {
-  await loadRecommendations()
+  const heroFlow = (async () => {
+    await checkBrowserLocationPermission()
+    await loadForecastBlocks()
+  })()
+
+  const deferredRecommendations = new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      setTimeout(async () => {
+        await loadRecommendations()
+        resolve()
+      }, 0)
+    })
+  })
+
+  await Promise.all([heroFlow, deferredRecommendations])
 })
 </script>
 
 <template>
   <div class="min-h-screen bg-white text-slate-900">
+    <Transition name="page-overlay-fade">
+      <div
+        v-if="heroLoading"
+        class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/92"
+      >
+        <div class="text-center text-white">
+          <div class="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-white/30 border-t-white"></div>
+          <p class="mt-4 text-sm font-semibold uppercase tracking-widest text-white/85">
+            Loading Smart Actions
+          </p>
+        </div>
+      </div>
+    </Transition>
+
     <SiteHeader />
 
-    <main class="mx-auto flex w-full max-w-5xl flex-col items-center px-6 py-10 text-center lg:px-10">
-      <h1 class="text-3xl font-extrabold tracking-tight text-[var(--gb-grid)] lg:text-4xl">Smart Actions</h1>
+    <section class="w-full">
+      <Transition name="hero-fade">
+        <Card
+          v-if="forecastSnapshot"
+          key="hero-weather"
+          :class="dashboardToneClass"
+          class="relative mx-auto w-full max-w-none overflow-hidden rounded-none border-transparent bg-slate-950 bg-gradient-to-br px-2 py-6 shadow-sm lg:px-4 lg:py-8"
+        >
+          <video
+            class="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-100"
+            :src="moodVideoSrc"
+            autoplay
+            muted
+            loop
+            playsinline
+          />
+
+          <div class="absolute inset-0 bg-slate-900/18"></div>
+
+          <div class="relative min-h-[620px] w-full">
+            <Card :class="glassCardClass" class="hero-card hero-top-left rounded-2xl border p-4">
+              <CardHeader class="p-0">
+                <CardTitle
+                  class="rounded-lg bg-black/20 px-3 py-1.5 text-center text-sm font-semibold tracking-wide text-white"
+                >
+                  {{ forecastSnapshot.locationLabel }}
+                </CardTitle>
+              </CardHeader>
+              <CardContent class="mt-3 flex min-h-[140px] items-center justify-center p-0 text-center">
+                <div>
+                  <p class="text-5xl font-bold leading-none text-white lg:text-6xl">
+                    {{ forecastSnapshot.currentTempC.toFixed(0) }}°
+                  </p>
+                  <p class="mt-1 text-lg text-white">{{ conditionLabel }}</p>
+                  <p class="mt-1 text-sm text-white/80">
+                    Today: {{ displayTodayMinC.toFixed(0) }}° / {{ displayTodayMaxC.toFixed(0) }}°
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card :class="glassCardClass" class="hero-card hero-top-right rounded-2xl border p-4">
+              <CardHeader class="p-0">
+                <CardTitle class="text-sm font-bold uppercase tracking-widest text-white/85">Conditions</CardTitle>
+              </CardHeader>
+              <CardContent class="mt-2 grid grid-cols-2 gap-3 p-0 text-sm">
+                <div :class="glassTileClass" class="rounded-lg border px-3 py-3 text-center">
+                  <p class="text-sm font-bold text-white/85">Today</p>
+                  <Thermometer class="mx-auto mt-1 h-5 w-5 text-white" />
+                  <p class="mt-2 text-base font-bold text-white">
+                    {{ displayTodayMaxC.toFixed(0) }}° / {{ displayTodayMinC.toFixed(0) }}°
+                  </p>
+                </div>
+                <div :class="glassTileClass" class="rounded-lg border px-3 py-3 text-center">
+                  <p class="text-sm font-bold text-white/85">Tomorrow</p>
+                  <Sun class="mx-auto mt-1 h-5 w-5 text-white" />
+                  <p class="mt-2 text-base font-bold text-white">{{ forecastSnapshot.tomorrowMaxC.toFixed(0) }}° max</p>
+                </div>
+                <div :class="glassTileClass" class="rounded-lg border px-3 py-3 text-center">
+                  <p class="text-sm font-bold text-white/85">Humidity</p>
+                  <Droplets class="mx-auto mt-1 h-5 w-5 text-white" />
+                  <p class="mt-2 text-base font-bold text-white">{{ displayHumidityPct }}%</p>
+                </div>
+                <div :class="glassTileClass" class="rounded-lg border px-3 py-3 text-center">
+                  <p class="text-sm font-bold text-white/85">Wind</p>
+                  <Wind class="mx-auto mt-1 h-5 w-5 text-white" />
+                  <p class="mt-2 text-base font-bold text-white">{{ displayWindKph }} km/h</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card :class="glassCardClass" class="hero-card hero-bottom-left rounded-2xl border p-4">
+              <CardHeader class="p-0">
+                <CardTitle class="text-sm font-semibold uppercase tracking-widest text-white/80">Alert Status</CardTitle>
+              </CardHeader>
+              <CardContent class="mt-2 p-0">
+                <div class="space-y-2">
+                  <div :class="glassTileClass" class="rounded-lg border px-3 py-2 text-center">
+                    <p :class="isHeatwaveTomorrow ? 'text-rose-300' : 'text-emerald-300'" class="text-lg font-semibold">
+                      {{ isHeatwaveTomorrow ? 'Heatwave Alert' : 'No Heatwave Alert' }}
+                    </p>
+                    <p class="mt-1 text-xs text-white/80">
+                      {{ tomorrowDateLabel }} · Max {{ forecastSnapshot.tomorrowMaxC.toFixed(1) }}°C
+                    </p>
+                  </div>
+                  <div :class="glassTileClass" class="rounded-lg border px-4 py-4">
+                    <div class="flex items-center justify-center gap-3">
+                      <p class="text-lg font-bold text-white/95">UV Index</p>
+                      <div class="h-24 w-24">
+                        <svg viewBox="0 0 100 100" class="h-full w-full">
+                          <circle cx="50" cy="50" :r="uvRing.radius" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="8" />
+                          <circle
+                            cx="50"
+                            cy="50"
+                            :r="uvRing.radius"
+                            fill="none"
+                            :class="uvIndicatorClass"
+                            stroke="currentColor"
+                            stroke-width="8"
+                            stroke-linecap="round"
+                            :stroke-dasharray="uvRing.circumference"
+                            :stroke-dashoffset="uvRing.dashOffset"
+                            transform="rotate(-90 50 50)"
+                          />
+                          <text x="50" y="47" text-anchor="middle" class="fill-white text-[14px] font-bold">
+                            {{ uvValue.toFixed(1) }}
+                          </text>
+                          <text x="50" y="61" text-anchor="middle" class="fill-white/90 text-[11px] font-bold">
+                            {{ uvLabel }}
+                          </text>
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card :class="glassCardClass" class="hero-card hero-bottom-right rounded-2xl border p-4">
+              <CardHeader class="p-0">
+                <CardTitle class="text-sm font-semibold uppercase tracking-widest text-white/85">Next 12 Hours Trend</CardTitle>
+              </CardHeader>
+              <CardContent class="mt-2 h-56 p-0">
+                <Line :data="hourlyChartData" :options="hourlyChartOptions" />
+              </CardContent>
+            </Card>
+
+            <div class="hero-center-quote">
+              <h1 class="text-3xl font-extrabold leading-tight text-white lg:text-5xl">Smart Actions, Smarter Outcomes.</h1>
+              <p class="mx-auto mt-3 max-w-xl text-base text-white/90 lg:text-lg">
+                Every action you choose today helps reduce pressure on the grid and climate impact tomorrow.
+              </p>
+              <Button
+                size="lg"
+                class="mt-6 bg-[var(--gb-electric)] px-8 text-white hover:bg-[#4CBB17] hover:text-white"
+                @click="scrollToActionFlow"
+              >
+                Act Now
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        <div
+          v-else
+          key="hero-fallback"
+          class="relative mx-auto flex min-h-[620px] w-full items-center justify-center overflow-hidden bg-slate-900 text-center"
+        >
+          <div class="px-6 text-white">
+            <p class="text-2xl font-bold lg:text-3xl">Smart Actions, Smarter Outcomes.</p>
+            <p class="mt-3 text-sm text-white/85 lg:text-base">
+              Weather context is temporarily unavailable. You can still continue with Smart Actions.
+            </p>
+            <Button
+              size="lg"
+              class="mt-6 bg-[var(--gb-electric)] px-8 text-white hover:bg-[#4CBB17] hover:text-white"
+              @click="scrollToActionFlow"
+            >
+              Act Now
+            </Button>
+          </div>
+        </div>
+      </Transition>
+    </section>
+
+    <main id="smart-actions-flow" class="mx-auto flex w-full max-w-5xl flex-col items-center px-6 py-10 text-center lg:px-10">
+      <h2 class="text-3xl font-extrabold tracking-tight text-[var(--gb-grid)] lg:text-4xl">Smart Actions</h2>
 
       <Card
         v-if="!isUnlocked"
@@ -206,7 +864,7 @@ onMounted(async () => {
         <p v-if="errorMessage" class="mt-6 text-sm font-semibold text-red-600">{{ errorMessage }}</p>
 
         <section v-if="apiResponse" class="mt-8 w-full">
-          <h2 class="text-2xl font-bold">Recommendations</h2>
+          <h3 class="text-2xl font-bold">Recommendations</h3>
 
           <div class="mt-5 grid gap-4 md:grid-cols-2">
             <div
@@ -271,7 +929,7 @@ onMounted(async () => {
         </section>
 
         <section v-if="apiResponse" class="mt-10 w-full">
-          <h2 class="text-2xl font-bold">Action Items</h2>
+          <h3 class="text-2xl font-bold">Action Items</h3>
           <p class="mx-auto mt-2 max-w-2xl text-sm text-slate-700">
             Select only the actions you completed today (choose any that apply).
           </p>
@@ -329,7 +987,7 @@ onMounted(async () => {
         </section>
 
         <section v-if="apiResponse && showImpactSummary && hasSelection" class="mt-10 w-full">
-          <h2 class="text-2xl font-bold">Impact Summary</h2>
+          <h3 class="text-2xl font-bold">Impact Summary</h3>
           <p class="mt-2 text-sm text-slate-700">
             Impact calculated for {{ selectedCount }} selected action<span v-if="selectedCount > 1">s</span>.
           </p>
@@ -359,6 +1017,55 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.hero-card {
+  position: absolute;
+  width: min(33.5vw, 430px);
+}
+
+.hero-top-left {
+  top: 10px;
+  left: 10px;
+}
+
+.hero-top-right {
+  top: 10px;
+  right: 10px;
+}
+
+.hero-bottom-left {
+  bottom: 10px;
+  left: 10px;
+}
+
+.hero-bottom-right {
+  bottom: 10px;
+  right: 10px;
+}
+
+.hero-center-quote {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(56vw, 700px);
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .hero-card {
+    position: static;
+    width: 100%;
+  }
+
+  .hero-center-quote {
+    position: static;
+    width: 100%;
+    transform: none;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+  }
+}
+
 .flip-card {
   perspective: 1000px;
 }
@@ -390,5 +1097,31 @@ onMounted(async () => {
 
 .flip-card-back {
   transform: rotateY(180deg);
+}
+
+.hero-fade-enter-active,
+.hero-fade-leave-active {
+  transition: opacity 380ms ease;
+}
+
+.hero-fade-enter-from,
+.hero-fade-leave-to {
+  opacity: 0;
+}
+
+.hero-fade-leave-active {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+}
+
+.page-overlay-fade-enter-active,
+.page-overlay-fade-leave-active {
+  transition: opacity 320ms ease;
+}
+
+.page-overlay-fade-enter-from,
+.page-overlay-fade-leave-to {
+  opacity: 0;
 }
 </style>
