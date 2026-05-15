@@ -687,10 +687,13 @@ onMounted(async () => {
         <Card
           v-if="forecastSnapshot"
           key="hero-weather"
-          class="relative mx-auto w-full max-w-none overflow-hidden rounded-none border-transparent bg-white px-2 py-6 shadow-sm lg:px-4 lg:py-8"
+          class="relative mx-auto w-full max-w-none overflow-hidden rounded-none border-transparent bg-white p-0 shadow-sm"
         >
-          <div class="relative min-h-[620px] w-full">
-            <Card class="hero-card hero-temp-card float-card hero-top-left rounded-2xl border border-slate-300 bg-white/75 p-4 shadow-sm backdrop-blur-sm">
+          <div class="smart-actions-hero-surface relative min-h-[730px] w-full overflow-hidden rounded-none">
+            <div class="smart-actions-hero-bg" aria-hidden="true"></div>
+            <div class="smart-actions-hero-overlay" aria-hidden="true"></div>
+
+            <Card class="hero-card hero-temp-card hero-primary-card hero-accent-green float-card hero-top-left rounded-2xl p-4">
               <CardHeader class="p-0">
                 <CardTitle
                   class="rounded-lg bg-slate-100/80 px-3 py-1.5 text-center text-sm font-semibold tracking-wide text-slate-800"
@@ -707,7 +710,7 @@ onMounted(async () => {
               </CardContent>
             </Card>
 
-            <Card class="hero-card float-card-delay hero-top-right rounded-2xl border border-slate-300 bg-white/75 p-4 shadow-sm backdrop-blur-sm">
+            <Card class="hero-card hero-accent-orange float-card-delay hero-top-right rounded-2xl p-4">
               <CardContent class="p-0 text-sm">
                 <p class="text-center text-sm font-semibold uppercase tracking-wide text-slate-700">Today</p>
                 <Thermometer class="mx-auto mt-2 h-5 w-5 text-slate-700" />
@@ -717,7 +720,7 @@ onMounted(async () => {
               </CardContent>
             </Card>
 
-            <Card class="hero-card float-card-soft hero-mid-right rounded-2xl border border-slate-300 bg-white/75 p-4 shadow-sm backdrop-blur-sm">
+            <Card class="hero-card hero-accent-green float-card-soft hero-mid-right rounded-2xl p-4">
               <CardContent class="p-0 text-sm">
                 <p class="text-center text-sm font-semibold uppercase tracking-wide text-slate-700">Tomorrow</p>
                 <Sun class="mx-auto mt-2 h-5 w-5 text-slate-700" />
@@ -725,7 +728,7 @@ onMounted(async () => {
               </CardContent>
             </Card>
 
-            <Card class="hero-card float-card-delay hero-bottom-left rounded-2xl border border-slate-300 bg-white/75 p-4 shadow-sm backdrop-blur-sm">
+            <Card class="hero-card hero-accent-green float-card-delay hero-bottom-left rounded-2xl p-4">
               <CardContent class="p-0">
                 <p class="text-center text-lg font-bold text-slate-800">UV Index</p>
                 <div class="mt-2 flex justify-center">
@@ -757,21 +760,21 @@ onMounted(async () => {
               </CardContent>
             </Card>
 
-            <Card class="hero-card float-card hero-mid-left rounded-2xl border border-slate-300 bg-white/75 p-4 shadow-sm backdrop-blur-sm">
+            <Card class="hero-card hero-accent-orange float-card hero-mid-left rounded-2xl p-4">
               <CardContent class="p-0 text-center">
                 <p class="text-sm font-semibold uppercase tracking-wide text-slate-700">Humidity</p>
                 <p class="mt-2 text-base font-bold text-slate-900">{{ displayHumidityPct }}%</p>
               </CardContent>
             </Card>
 
-            <Card class="hero-card float-card-soft hero-bottom-mid rounded-2xl border border-slate-300 bg-white/75 p-4 shadow-sm backdrop-blur-sm">
+            <Card class="hero-card hero-accent-green float-card-soft hero-bottom-mid rounded-2xl p-4">
               <CardContent class="p-0 text-center">
                 <p class="text-sm font-semibold uppercase tracking-wide text-slate-700">Wind</p>
                 <p class="mt-2 text-base font-bold text-slate-900">{{ displayWindKph }} km/h</p>
               </CardContent>
             </Card>
 
-            <Card class="hero-card float-card-delay hero-bottom-right rounded-2xl border border-slate-300 bg-white/75 p-4 shadow-sm backdrop-blur-sm">
+            <Card class="hero-card hero-trend-card hero-accent-orange float-card-delay hero-bottom-right rounded-2xl p-4">
               <CardHeader class="p-0">
                 <CardTitle class="text-sm font-semibold uppercase tracking-widest text-slate-700">Next Hours Trend</CardTitle>
               </CardHeader>
@@ -996,13 +999,80 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.smart-actions-hero-surface {
+  background: #ffffff;
+}
+
+.smart-actions-hero-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url('/smart-actions-doodle-bg.png');
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 1;
+  z-index: 0;
+}
+
+.smart-actions-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  z-index: 1;
+}
+
 .hero-card {
   position: absolute;
   width: min(17.5vw, 248px);
+  z-index: 20;
+  border: 1px solid rgba(47, 127, 121, 0.22);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 14px 32px rgba(15, 23, 42, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.7) inset;
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.hero-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 14px;
+  height: 3px;
+  border-radius: 999px;
+  opacity: 0.95;
+}
+
+.hero-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 18px 36px rgba(15, 23, 42, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.75) inset;
+}
+
+.hero-accent-green::before {
+  background: linear-gradient(90deg, #2f7f79 0%, #1f9d89 100%);
+}
+
+.hero-accent-orange::before {
+  background: linear-gradient(90deg, #f0aa3c 0%, #f59e0b 100%);
+}
+
+.hero-primary-card {
+  border-color: rgba(47, 127, 121, 0.3);
+  box-shadow:
+    0 18px 38px rgba(15, 23, 42, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.75) inset;
 }
 
 .hero-temp-card {
-  width: min(21vw, 300px);
+  width: min(22vw, 316px);
+}
+
+.hero-trend-card {
+  width: min(30vw, 455px);
 }
 
 .hero-top-left {
@@ -1038,13 +1108,12 @@ onMounted(async () => {
 .hero-bottom-right {
   top: 34%;
   right: 4%;
-  width: min(28vw, 420px);
 }
 
 .hero-center-quote {
   position: absolute;
   left: 50%;
-  top: 44%;
+  top: 50%;
   width: min(56vw, 700px);
   transform: translate(-50%, -50%);
   text-align: center;
