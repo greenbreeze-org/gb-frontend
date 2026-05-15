@@ -429,8 +429,10 @@ const next12Hourly = computed(() => {
   return source.slice(startIndex, startIndex + 12)
 })
 
+const sampledHourly = computed(() => next12Hourly.value.filter((_, index) => index % 2 === 0))
+
 const hourlyLabels = computed(() =>
-  next12Hourly.value.map((h) => {
+  sampledHourly.value.map((h) => {
     const date = new Date(h.time)
     if (Number.isNaN(date.getTime())) return '--:--'
     return date.toLocaleTimeString('en-AU', {
@@ -442,7 +444,7 @@ const hourlyLabels = computed(() =>
   }),
 )
 
-const hourlyTemps = computed(() => next12Hourly.value.map((h) => Math.round(h.tempC)))
+const hourlyTemps = computed(() => sampledHourly.value.map((h) => Math.round(h.tempC)))
 const midnightLabelIndex = computed(() => hourlyLabels.value.findIndex((label) => label === '00:00'))
 
 const hourlyChartData = computed<ChartData<'line'>>(() => ({
@@ -477,6 +479,8 @@ const hourlyChartOptions = computed<ChartOptions<'line'>>(() => ({
   plugins: {
     legend: { display: false },
     tooltip: {
+      mode: 'index',
+      intersect: false,
       callbacks: {
         label: (ctx) => `${ctx.parsed.y}°C`,
       },
@@ -508,10 +512,10 @@ const hourlyChartOptions = computed<ChartOptions<'line'>>(() => ({
   },
   scales: {
     x: {
-      grid: { display: false },
-      border: { display: false },
+      grid: { color: 'rgba(148,163,184,0.24)' },
+      border: { display: true, color: 'rgba(100,116,139,0.45)' },
       ticks: {
-        color: 'rgba(255,255,255,0.78)',
+        color: 'rgba(30,41,59,0.9)',
         maxRotation: 0,
         autoSkip: true,
         maxTicksLimit: 7,
@@ -519,13 +523,17 @@ const hourlyChartOptions = computed<ChartOptions<'line'>>(() => ({
     },
     y: {
       beginAtZero: false,
-      grid: { color: 'rgba(255,255,255,0.14)' },
-      border: { display: false },
+      grid: { color: 'rgba(148,163,184,0.24)' },
+      border: { display: true, color: 'rgba(100,116,139,0.45)' },
       ticks: {
-        color: 'rgba(255,255,255,0.82)',
+        color: 'rgba(30,41,59,0.9)',
         callback: (value) => `${value}°`,
       },
     },
+  },
+  interaction: {
+    mode: 'index',
+    intersect: false,
   },
 }))
 
@@ -679,122 +687,93 @@ onMounted(async () => {
         <Card
           v-if="forecastSnapshot"
           key="hero-weather"
-          :class="dashboardToneClass"
-          class="relative mx-auto w-full max-w-none overflow-hidden rounded-none border-transparent bg-slate-950 bg-gradient-to-br px-2 py-6 shadow-sm lg:px-4 lg:py-8"
+          class="relative mx-auto w-full max-w-none overflow-hidden rounded-none border-transparent bg-white px-2 py-6 shadow-sm lg:px-4 lg:py-8"
         >
-          <video
-            class="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-100"
-            :src="moodVideoSrc"
-            autoplay
-            muted
-            loop
-            playsinline
-          />
-
-          <div class="absolute inset-0 bg-slate-900/18"></div>
-
           <div class="relative min-h-[620px] w-full">
-            <Card :class="glassCardClass" class="hero-card hero-top-left rounded-2xl border p-4">
+            <Card class="hero-card hero-temp-card float-card hero-top-left rounded-2xl border border-slate-300 bg-white/75 p-4 shadow-sm backdrop-blur-sm">
               <CardHeader class="p-0">
                 <CardTitle
-                  class="rounded-lg bg-black/20 px-3 py-1.5 text-center text-sm font-semibold tracking-wide text-white"
+                  class="rounded-lg bg-slate-100/80 px-3 py-1.5 text-center text-sm font-semibold tracking-wide text-slate-800"
                 >
                   {{ forecastSnapshot.locationLabel }}
                 </CardTitle>
               </CardHeader>
-              <CardContent class="mt-3 flex min-h-[140px] items-center justify-center p-0 text-center">
+              <CardContent class="mt-3 flex items-center justify-center p-0 text-center">
                 <div>
-                  <p class="text-5xl font-bold leading-none text-white lg:text-6xl">
+                  <p class="text-5xl font-bold leading-none text-slate-900 lg:text-6xl">
                     {{ forecastSnapshot.currentTempC.toFixed(0) }}°
                   </p>
-                  <p class="mt-1 text-lg text-white">{{ conditionLabel }}</p>
-                  <p class="mt-1 text-sm text-white/80">
-                    Today: {{ displayTodayMinC.toFixed(0) }}° / {{ displayTodayMaxC.toFixed(0) }}°
-                  </p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card :class="glassCardClass" class="hero-card hero-top-right rounded-2xl border p-4">
-              <CardHeader class="p-0">
-                <CardTitle class="text-sm font-bold uppercase tracking-widest text-white/85">Conditions</CardTitle>
-              </CardHeader>
-              <CardContent class="mt-2 grid grid-cols-2 gap-3 p-0 text-sm">
-                <div :class="glassTileClass" class="rounded-lg border px-3 py-3 text-center">
-                  <p class="text-sm font-bold text-white/85">Today</p>
-                  <Thermometer class="mx-auto mt-1 h-5 w-5 text-white" />
-                  <p class="mt-2 text-base font-bold text-white">
+            <Card class="hero-card float-card-delay hero-top-right rounded-2xl border border-slate-300 bg-white/75 p-4 shadow-sm backdrop-blur-sm">
+              <CardContent class="p-0 text-sm">
+                <p class="text-center text-sm font-semibold uppercase tracking-wide text-slate-700">Today</p>
+                <Thermometer class="mx-auto mt-2 h-5 w-5 text-slate-700" />
+                <p class="mt-2 text-center text-base font-bold text-slate-900">
                     {{ displayTodayMaxC.toFixed(0) }}° / {{ displayTodayMinC.toFixed(0) }}°
-                  </p>
-                </div>
-                <div :class="glassTileClass" class="rounded-lg border px-3 py-3 text-center">
-                  <p class="text-sm font-bold text-white/85">Tomorrow</p>
-                  <Sun class="mx-auto mt-1 h-5 w-5 text-white" />
-                  <p class="mt-2 text-base font-bold text-white">{{ forecastSnapshot.tomorrowMaxC.toFixed(0) }}° max</p>
-                </div>
-                <div :class="glassTileClass" class="rounded-lg border px-3 py-3 text-center">
-                  <p class="text-sm font-bold text-white/85">Humidity</p>
-                  <Droplets class="mx-auto mt-1 h-5 w-5 text-white" />
-                  <p class="mt-2 text-base font-bold text-white">{{ displayHumidityPct }}%</p>
-                </div>
-                <div :class="glassTileClass" class="rounded-lg border px-3 py-3 text-center">
-                  <p class="text-sm font-bold text-white/85">Wind</p>
-                  <Wind class="mx-auto mt-1 h-5 w-5 text-white" />
-                  <p class="mt-2 text-base font-bold text-white">{{ displayWindKph }} km/h</p>
-                </div>
+                </p>
               </CardContent>
             </Card>
 
-            <Card :class="glassCardClass" class="hero-card hero-bottom-left rounded-2xl border p-4">
-              <CardHeader class="p-0">
-                <CardTitle class="text-sm font-semibold uppercase tracking-widest text-white/80">Alert Status</CardTitle>
-              </CardHeader>
-              <CardContent class="mt-2 p-0">
-                <div class="space-y-2">
-                  <div :class="glassTileClass" class="rounded-lg border px-3 py-2 text-center">
-                    <p :class="isHeatwaveTomorrow ? 'text-rose-300' : 'text-emerald-300'" class="text-lg font-semibold">
-                      {{ isHeatwaveTomorrow ? 'Heatwave Alert' : 'No Heatwave Alert' }}
-                    </p>
-                    <p class="mt-1 text-xs text-white/80">
-                      {{ tomorrowDateLabel }} · Max {{ forecastSnapshot.tomorrowMaxC.toFixed(1) }}°C
-                    </p>
-                  </div>
-                  <div :class="glassTileClass" class="rounded-lg border px-4 py-4">
-                    <div class="flex items-center justify-center gap-3">
-                      <p class="text-lg font-bold text-white/95">UV Index</p>
-                      <div class="h-24 w-24">
-                        <svg viewBox="0 0 100 100" class="h-full w-full">
-                          <circle cx="50" cy="50" :r="uvRing.radius" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="8" />
-                          <circle
-                            cx="50"
-                            cy="50"
-                            :r="uvRing.radius"
-                            fill="none"
-                            :class="uvIndicatorClass"
-                            stroke="currentColor"
-                            stroke-width="8"
-                            stroke-linecap="round"
-                            :stroke-dasharray="uvRing.circumference"
-                            :stroke-dashoffset="uvRing.dashOffset"
-                            transform="rotate(-90 50 50)"
-                          />
-                          <text x="50" y="47" text-anchor="middle" class="fill-white text-[14px] font-bold">
-                            {{ uvValue.toFixed(1) }}
-                          </text>
-                          <text x="50" y="61" text-anchor="middle" class="fill-white/90 text-[11px] font-bold">
-                            {{ uvLabel }}
-                          </text>
-                        </svg>
-                      </div>
-                    </div>
+            <Card class="hero-card float-card-soft hero-mid-right rounded-2xl border border-slate-300 bg-white/75 p-4 shadow-sm backdrop-blur-sm">
+              <CardContent class="p-0 text-sm">
+                <p class="text-center text-sm font-semibold uppercase tracking-wide text-slate-700">Tomorrow</p>
+                <Sun class="mx-auto mt-2 h-5 w-5 text-slate-700" />
+                <p class="mt-2 text-center text-base font-bold text-slate-900">{{ forecastSnapshot.tomorrowMaxC.toFixed(0) }}° max</p>
+              </CardContent>
+            </Card>
+
+            <Card class="hero-card float-card-delay hero-bottom-left rounded-2xl border border-slate-300 bg-white/75 p-4 shadow-sm backdrop-blur-sm">
+              <CardContent class="p-0">
+                <p class="text-center text-lg font-bold text-slate-800">UV Index</p>
+                <div class="mt-2 flex justify-center">
+                  <div class="h-24 w-24">
+                    <svg viewBox="0 0 100 100" class="h-full w-full">
+                      <circle cx="50" cy="50" :r="uvRing.radius" fill="none" stroke="rgba(71,85,105,0.25)" stroke-width="8" />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        :r="uvRing.radius"
+                        fill="none"
+                        :class="uvIndicatorClass"
+                        stroke="currentColor"
+                        stroke-width="8"
+                        stroke-linecap="round"
+                        :stroke-dasharray="uvRing.circumference"
+                        :stroke-dashoffset="uvRing.dashOffset"
+                        transform="rotate(-90 50 50)"
+                      />
+                      <text x="50" y="47" text-anchor="middle" class="fill-slate-800 text-[14px] font-bold">
+                        {{ uvValue.toFixed(1) }}
+                      </text>
+                      <text x="50" y="61" text-anchor="middle" class="fill-slate-700 text-[11px] font-bold">
+                        {{ uvLabel }}
+                      </text>
+                    </svg>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card :class="glassCardClass" class="hero-card hero-bottom-right rounded-2xl border p-4">
+            <Card class="hero-card float-card hero-mid-left rounded-2xl border border-slate-300 bg-white/75 p-4 shadow-sm backdrop-blur-sm">
+              <CardContent class="p-0 text-center">
+                <p class="text-sm font-semibold uppercase tracking-wide text-slate-700">Humidity</p>
+                <p class="mt-2 text-base font-bold text-slate-900">{{ displayHumidityPct }}%</p>
+              </CardContent>
+            </Card>
+
+            <Card class="hero-card float-card-soft hero-bottom-mid rounded-2xl border border-slate-300 bg-white/75 p-4 shadow-sm backdrop-blur-sm">
+              <CardContent class="p-0 text-center">
+                <p class="text-sm font-semibold uppercase tracking-wide text-slate-700">Wind</p>
+                <p class="mt-2 text-base font-bold text-slate-900">{{ displayWindKph }} km/h</p>
+              </CardContent>
+            </Card>
+
+            <Card class="hero-card float-card-delay hero-bottom-right rounded-2xl border border-slate-300 bg-white/75 p-4 shadow-sm backdrop-blur-sm">
               <CardHeader class="p-0">
-                <CardTitle class="text-sm font-semibold uppercase tracking-widest text-white/85">Next 12 Hours Trend</CardTitle>
+                <CardTitle class="text-sm font-semibold uppercase tracking-widest text-slate-700">Next Hours Trend</CardTitle>
               </CardHeader>
               <CardContent class="mt-2 h-56 p-0">
                 <Line :data="hourlyChartData" :options="hourlyChartOptions" />
@@ -802,8 +781,8 @@ onMounted(async () => {
             </Card>
 
             <div class="hero-center-quote">
-              <h1 class="text-3xl font-extrabold leading-tight text-white lg:text-5xl">Smart Actions, Smarter Outcomes.</h1>
-              <p class="mx-auto mt-3 max-w-xl text-base text-white/90 lg:text-lg">
+              <h1 class="text-3xl font-extrabold leading-tight text-slate-900 lg:text-5xl">Smart Actions, Smarter Outcomes.</h1>
+              <p class="mx-auto mt-3 max-w-xl text-base text-slate-700 lg:text-lg">
                 Every action you choose today helps reduce pressure on the grid and climate impact tomorrow.
               </p>
               <Button
@@ -1019,36 +998,57 @@ onMounted(async () => {
 <style scoped>
 .hero-card {
   position: absolute;
-  width: min(33.5vw, 430px);
+  width: min(17.5vw, 248px);
+}
+
+.hero-temp-card {
+  width: min(21vw, 300px);
 }
 
 .hero-top-left {
-  top: 10px;
-  left: 10px;
+  top: 16%;
+  left: 6%;
 }
 
 .hero-top-right {
-  top: 10px;
-  right: 10px;
+  top: 8%;
+  right: 7%;
 }
 
 .hero-bottom-left {
-  bottom: 10px;
-  left: 10px;
+  top: 68%;
+  left: 5%;
+}
+
+.hero-mid-right {
+  top: 2%;
+  right: 42%;
+}
+
+.hero-mid-left {
+  top: 73%;
+  left: 30%;
+}
+
+.hero-bottom-mid {
+  top: 77%;
+  left: 48%;
 }
 
 .hero-bottom-right {
-  bottom: 10px;
-  right: 10px;
+  top: 34%;
+  right: 4%;
+  width: min(28vw, 420px);
 }
 
 .hero-center-quote {
   position: absolute;
   left: 50%;
-  top: 50%;
+  top: 44%;
   width: min(56vw, 700px);
   transform: translate(-50%, -50%);
   text-align: center;
+  z-index: 40;
 }
 
 @media (max-width: 1100px) {
@@ -1064,6 +1064,18 @@ onMounted(async () => {
     margin-top: 1rem;
     margin-bottom: 1rem;
   }
+}
+
+.float-card {
+  animation: cardFloat 5.2s ease-in-out infinite;
+}
+
+.float-card-delay {
+  animation: cardFloat 6.1s ease-in-out infinite;
+}
+
+.float-card-soft {
+  animation: cardFloat 7s ease-in-out infinite;
 }
 
 .flip-card {
@@ -1123,5 +1135,15 @@ onMounted(async () => {
 .page-overlay-fade-enter-from,
 .page-overlay-fade-leave-to {
   opacity: 0;
+}
+
+@keyframes cardFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
 }
 </style>
