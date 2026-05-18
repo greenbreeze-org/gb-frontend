@@ -30,24 +30,32 @@ const forcePostcodeInput = ref(false)
 
 const locationStatus = ref<'checking' | 'granted' | 'denied' | 'unavailable'>('checking')
 const locationCoords = ref<{ lat: number; lon: number } | null>(null)
+const MELBOURNE_FALLBACK_POSTCODE = '3000'
 
 const houseMaterialOptions = [
-  { value: 'brick-veneer', label: 'Brick Veneer' },
-  { value: 'double-brick', label: 'Double Brick' },
-  { value: 'weatherboard-timber', label: 'Weatherboard / Timber' },
-  { value: 'lightweight-cladding', label: 'Lightweight Cladding (Fiber Cement / Metal)' },
+  { value: 'double_brick', label: 'Double brick' },
+  { value: 'stone', label: 'Stone' },
+  { value: 'insulated_frame', label: 'Insulated frame' },
+  { value: 'brick_veneer', label: 'Brick veneer' },
+  { value: 'cavity_brick', label: 'Cavity brick' },
+  { value: 'light_timber', label: 'Light timber' },
+  { value: 'uninsulated_frame', label: 'Uninsulated frame' },
 ]
 
 const deviceOptions = [
-  { value: 'ac_split', label: 'Air Conditioner (Split System)' },
-  { value: 'ac_ducted', label: 'Air Conditioner (Ducted)' },
-  { value: 'evaporative', label: 'Evaporative Cooler' },
-  { value: 'fan_ceiling', label: 'Ceiling Fan' },
-  { value: 'fan_portable', label: 'Portable Fan' },
-  { value: 'heat_pump', label: 'Heat Pump Heater' },
-  { value: 'electric_heater', label: 'Electric Heater' },
-  { value: 'gas_heater', label: 'Gas Heater' },
+  { value: 'reverse_cycle_split', label: 'Reverse-cycle split system' },
+  { value: 'heat_pump', label: 'Heat pump' },
+  { value: 'ducted_inverter', label: 'Ducted inverter system' },
+  { value: 'evaporative_cooler', label: 'Evaporative cooler' },
+  { value: 'ducted_non_inverter', label: 'Ducted non-inverter system' },
+  { value: 'gas_heater', label: 'Gas heater' },
+  { value: 'portable_electric', label: 'Portable electric heater' },
+  { value: 'underfloor_heating', label: 'Electric underfloor heating' },
+  { value: 'fan', label: 'Fan' },
 ]
+
+const allowedHouseMaterialValues = new Set(houseMaterialOptions.map((option) => option.value))
+const allowedDeviceValues = new Set(deviceOptions.map((option) => option.value))
 
 const hasValidVicPostcode = computed(() => {
   const code = Number(postcode.value.trim())
@@ -93,8 +101,13 @@ const restoreSetupFromSession = () => {
     }
 
     postcode.value = parsed.postcode ?? ''
-    houseMaterial.value = parsed.houseMaterial ?? ''
-    selectedDevices.value = Array.isArray(parsed.selectedDevices) ? parsed.selectedDevices : []
+    houseMaterial.value =
+      parsed.houseMaterial && allowedHouseMaterialValues.has(parsed.houseMaterial)
+        ? parsed.houseMaterial
+        : ''
+    selectedDevices.value = Array.isArray(parsed.selectedDevices)
+      ? parsed.selectedDevices.filter((device) => allowedDeviceValues.has(device))
+      : []
   } catch {
     sessionStorage.removeItem(PROFILE_SETUP_STORAGE_KEY)
   }
@@ -141,20 +154,21 @@ const requestBrowserLocation = async () => {
 }
 
 const checkBrowserLocationPermission = async () => {
-  const shared = loadSharedLocationState()
-  if (shared?.status === 'granted' && shared.coords) {
-    locationStatus.value = 'granted'
-    locationCoords.value = shared.coords
-    return
-  }
-
   if (!navigator.geolocation) {
     locationStatus.value = 'unavailable'
+    locationCoords.value = null
+    if (!postcode.value.trim()) postcode.value = MELBOURNE_FALLBACK_POSTCODE
     persistSharedLocationState('unavailable', null)
     return
   }
 
+  const shared = loadSharedLocationState()
   if (!('permissions' in navigator)) {
+    if (shared?.status === 'granted' && shared.coords) {
+      locationStatus.value = 'granted'
+      locationCoords.value = shared.coords
+      return
+    }
     await requestBrowserLocation()
     return
   }
@@ -169,7 +183,15 @@ const checkBrowserLocationPermission = async () => {
 
     if (permission.state === 'denied') {
       locationStatus.value = 'denied'
+      locationCoords.value = null
+      if (!postcode.value.trim()) postcode.value = MELBOURNE_FALLBACK_POSTCODE
       persistSharedLocationState('denied', null)
+      return
+    }
+
+    if (shared?.status === 'granted' && shared.coords) {
+      locationStatus.value = 'granted'
+      locationCoords.value = shared.coords
       return
     }
 
@@ -233,29 +255,31 @@ const submitProfile = async () => {
     persistSetupToSession()
     const setup = loadStoredProfileSetup()
     if (!setup) {
-      throw new Error('Unable to read profile setup')
+      throw new Error('Unable to read home profile setup')
     }
 
     const payload = mapToSmartActionsPayload(setup)
-    if (!payload.wall_type || payload.appliances.length === 0 || !payload.postcode) {
+    if (!payload.house_material || payload.appliances.length === 0 || !payload.postcode) {
       throw new Error('Selected devices/material are not compatible with recommendations API')
     }
 
     const response = await fetchSmartActionsRecommendations({
-      wall_type: payload.wall_type,
-      appliances: payload.appliances,
+      house_profile: {
+        house_material: payload.house_material,
+        appliances: payload.appliances,
+      },
       postcode: payload.postcode,
     })
 
     sessionStorage.setItem(SMART_ACTIONS_RESPONSE_KEY, JSON.stringify(response))
     sessionStorage.setItem(SMART_ACTIONS_UNLOCKED_KEY, 'true')
 
-    await router.push('/smart-actions')
+    await router.push({ path: '/smart-actions' })
   } catch (error) {
     if (error instanceof Error) {
       submitError.value = error.message
     } else {
-      submitError.value = 'Unable to submit profile setup right now.'
+      submitError.value = 'Unable to submit home profile setup right now.'
     }
   } finally {
     submitLoading.value = false
@@ -264,47 +288,68 @@ const submitProfile = async () => {
 
 onMounted(async () => {
   restoreSetupFromSession()
-  const shared = loadSharedLocationState()
-  if (shared?.status === 'granted' && shared.coords) {
-    locationStatus.value = 'granted'
-    locationCoords.value = shared.coords
-  }
+  if (!postcode.value.trim()) postcode.value = MELBOURNE_FALLBACK_POSTCODE
   await checkBrowserLocationPermission()
 })
 </script>
 
 <template>
   <div class="min-h-screen bg-white text-slate-900">
+    <Transition name="page-overlay-fade">
+      <div
+        v-if="submitLoading"
+        class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/92"
+      >
+        <div class="text-center text-white">
+          <div class="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-white/30 border-t-white"></div>
+          <p class="mt-4 text-sm font-semibold uppercase tracking-widest text-white/85">
+            Setting Up Home Profile
+          </p>
+        </div>
+      </div>
+    </Transition>
+
     <SiteHeader />
 
     <main class="mx-auto max-w-7xl px-6 py-10 lg:px-10">
-      <section class="mx-auto max-w-5xl rounded-2xl border border-slate-200 p-8 lg:p-10">
-        <h1 class="mb-8 text-center text-4xl font-bold tracking-tight">Profile Setup</h1>
+      <section class="profile-shell mx-auto max-w-6xl overflow-hidden rounded-2xl border border-slate-200">
+        <div class="profile-hero grid gap-0 md:grid-cols-[1fr_1.35fr]">
+          <div class="profile-hero-media relative min-h-[220px]">
+            <img src="/home-profile-card.jpg" alt="Home profile setup" class="h-full w-full object-contain" />
+          </div>
+          <div class="profile-hero-copy p-8 lg:p-10">
+            <p class="profile-chip">GreenBreeze Onboarding</p>
+            <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-[var(--gb-grid)]">Home Profile Setup</h1>
+            <p class="mt-3 text-base text-slate-700">
+              Set your home details once to unlock personalized Smart Actions and weather-linked recommendations.
+            </p>
+          </div>
+        </div>
 
-        <div class="mx-auto max-w-4xl">
-          <div class="mb-10 flex flex-wrap items-center justify-center gap-3">
+        <div class="mx-auto max-w-5xl p-8 pt-6 lg:p-10 lg:pt-8">
+          <div class="mb-8 flex flex-wrap items-center justify-center gap-3">
             <span
               v-if="locationStatus === 'granted'"
-              class="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white"
+              class="rounded-full bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white"
             >
               Location Granted
             </span>
             <span
               v-else-if="locationStatus === 'denied' || locationStatus === 'unavailable'"
-              class="rounded-md bg-red-600 px-3 py-1.5 text-sm font-semibold text-white"
+              class="rounded-full bg-red-600 px-4 py-1.5 text-sm font-semibold text-white"
             >
               Location Denied
             </span>
             <span
               v-else
-              class="rounded-md bg-slate-600 px-3 py-1.5 text-sm font-semibold text-white"
+              class="rounded-full bg-slate-600 px-4 py-1.5 text-sm font-semibold text-white"
             >
               Checking Location...
             </span>
           </div>
 
           <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div class="space-y-2">
+            <div class="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
               <Label for="house-material" class="text-base font-semibold"
                 >House Material (Detached House)</Label
               >
@@ -313,7 +358,7 @@ onMounted(async () => {
                 v-model="houseMaterial"
                 class="border-input focus-visible:ring-ring/50 h-11 w-full rounded-md border bg-white px-4 text-base outline-none focus-visible:ring-[3px]"
               >
-                <option value="" disabled>Select house material</option>
+                <option value="">Select house material</option>
                 <option
                   v-for="option in houseMaterialOptions"
                   :key="option.value"
@@ -327,10 +372,10 @@ onMounted(async () => {
 
             <div
               v-if="locationStatus === 'denied' || locationStatus === 'unavailable' || forcePostcodeInput"
-              class="space-y-2"
+              class="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4"
             >
               <Label for="postcode" class="text-base font-semibold"
-                >Postcode (VIC only, required when location is denied)</Label
+                >Postcode (VIC only)</Label
               >
               <Input id="postcode" v-model="postcode" placeholder="e.g. 3000" class="h-11 text-base" />
               <p v-if="locationError" class="text-sm text-red-600">{{ locationError }}</p>
@@ -358,23 +403,23 @@ onMounted(async () => {
 
           <div
             v-if="setupReady"
-            class="mt-6 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+            class="mt-6 mx-auto max-w-100 rounded-xl text-center bg-emerald-50 border border-emerald-800 px-4 py-3 text-sm text-emerald-800"
           >
             Profile setup is validated.
           </div>
 
-          <div v-else class="mt-6 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Please complete all setup fields to unlock full forecast insights.
+          <div v-else class="mt-6 mx-auto max-w-600 text-center border border-amber-800 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Please complete all Home Profile Setup fields to unlock full Smart Actions insights.
           </div>
 
           <div class="mt-6 flex items-center justify-center">
             <Button
               type="button"
-              class="h-11 bg-[var(--gb-electric)] px-8 text-white hover:bg-amber-300"
+              class="h-11 bg-[var(--gb-electric)] px-8 text-white hover:bg-[#4CBB17] hover:text-white"
               :disabled="!setupReady || submitLoading"
               @click="submitProfile"
             >
-              {{ submitLoading ? 'Submitting...' : 'Submit Profile Setup' }}
+              {{ submitLoading ? 'Submitting...' : 'Submit Home Profile Setup' }}
             </Button>
           </div>
           <p v-if="submitError" class="mt-3 text-center text-sm font-semibold text-red-600">{{ submitError }}</p>
@@ -385,3 +430,49 @@ onMounted(async () => {
     <SiteFooter />
   </div>
 </template>
+
+<style scoped>
+.profile-shell {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
+}
+
+.profile-hero {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.profile-hero-media {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.16), rgba(240, 170, 60, 0.16));
+}
+
+.profile-hero-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.profile-chip {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid rgba(47, 127, 121, 0.3);
+  background: rgba(47, 127, 121, 0.1);
+  padding: 0.28rem 0.72rem;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0f766e;
+}
+
+.page-overlay-fade-enter-active,
+.page-overlay-fade-leave-active {
+  transition: opacity 320ms ease;
+}
+
+.page-overlay-fade-enter-from,
+.page-overlay-fade-leave-to {
+  opacity: 0;
+}
+</style>

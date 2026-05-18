@@ -2,9 +2,8 @@
 // Imports
 import { DotLottieVue } from '@lottiefiles/dotlottie-vue'
 import type { DotLottieVueInstance } from '@lottiefiles/dotlottie-vue'
-import { Home, LineChart, Leaf } from 'lucide-vue-next'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import { Button } from '@/components/ui/button'
 import SiteFooter from '@/components/layout/SiteFooter.vue'
@@ -14,6 +13,12 @@ import SiteHeader from '@/components/layout/SiteHeader.vue'
 const earthLottieRef = ref<DotLottieVueInstance | null>(null)
 const houseLottieRef = ref<DotLottieVueInstance | null>(null)
 const cleanupFns: Array<() => void> = []
+const storySectionRef = ref<HTMLElement | null>(null)
+let revealObserver: IntersectionObserver | null = null
+
+const scrollToStorySection = () => {
+  storySectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 // Hold one-time lottie animations on a visible frame (avoid ending on blank frame)
 const holdNearLastFrame = (
@@ -46,12 +51,32 @@ onMounted(() => {
     if (earthCleanup) cleanupFns.push(earthCleanup)
     if (houseCleanup) cleanupFns.push(houseCleanup)
   }, 80)
+
+  const revealTargets = document.querySelectorAll<HTMLElement>('.reveal-on-scroll')
+  revealObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return
+        entry.target.classList.add('is-visible')
+        revealObserver?.unobserve(entry.target)
+      })
+    },
+    {
+      threshold: 0.18,
+      rootMargin: '0px 0px -8% 0px',
+    },
+  )
+
+  revealTargets.forEach((el) => revealObserver?.observe(el))
+
 })
 
 // Cleanup event listeners
 onBeforeUnmount(() => {
   cleanupFns.forEach((fn) => fn())
   cleanupFns.length = 0
+  revealObserver?.disconnect()
+  revealObserver = null
 })
 </script>
 
@@ -62,23 +87,45 @@ onBeforeUnmount(() => {
     <SiteHeader />
 
     <!-- Hero section -->
-    <section class="w-full">
+    <section class="hero-shell w-full reveal-on-scroll">
       <div
-        class="mx-auto grid max-w-7xl gap-10 px-6 pb-14 pt-10 lg:grid-cols-2 lg:items-center lg:px-10"
+        class="hero-content mx-auto grid max-w-7xl gap-10 px-6 pb-8 pt-8 lg:grid-cols-2 lg:items-center lg:px-10"
       >
         <!-- Hero: text content -->
         <div class="p-2 text-slate-900 lg:pr-12">
-          <h1 class="mt-4 text-2xl font-extrabold text-[#000] leading-tight lg:text-[55px]">
+          <h1 class="mt-4 text-2xl font-extrabold text-[#000] leading-tight lg:text-[55px] lg:leading-[1.05]">
             Smarter Comfort for Every Season.
             <span class="block text-[var(--gb-grid)]">
               Protect the <span class="electric-flicker text-[var(--gb-electric)]">Grid</span>.
               Preserve Climate.
             </span>
           </h1>
+
+          <div class="mt-7 flex flex-wrap items-center gap-3">
+            <Button
+              size="lg"
+              class="bg-[var(--gb-electric)] px-7 hover:bg-[#4CBB17] hover:text-white"
+              as-child
+            >
+              <RouterLink to="/smart-actions">Set Up My Home Profile</RouterLink>
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              class="px-7 hover:border-[#016601] hover:text-[#016601] hover:bg-[#f3f4f6]"
+              as-child
+            >
+              <RouterLink to="/awareness">Make myself aware</RouterLink>
+            </Button>
+          </div>
+
+          <p class="mt-4 text-sm font-semibold text-slate-600">
+            New here? Start with your Home Profile Setup.
+          </p>
         </div>
 
         <!-- Hero: animation composition -->
-        <div class="relative mx-auto h-[380px] w-full max-w-[620px] lg:h-[520px]">
+        <div class="relative mx-auto h-[320px] w-full max-w-[560px] lg:h-[470px] xl:h-[500px]">
           <!-- Hero animation: earth (plays once) -->
           <div
             class="absolute left-1/2 top-[52%] z-10 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 lg:h-[400px] lg:w-[400px]"
@@ -154,10 +201,19 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
+
+      <div class="hero-scroll-cue-wrap">
+        <button type="button" class="hero-scroll-cue" @click="scrollToStorySection">
+          <span>Scroll to explore</span>
+          <span class="hero-scroll-arrow" aria-hidden="true">↓</span>
+        </button>
+      </div>
+
+      <div class="hero-bottom-fade" aria-hidden="true"></div>
     </section>
 
     <!-- Story section: cause and impact chain -->
-    <section class="w-full py-4">
+    <section ref="storySectionRef" class="w-full py-4 reveal-on-scroll">
       <!-- Story section: heading -->
       <div class="relative w-full bg-[var(--gb-grid)] min-h-[240px] flex items-center justify-center overflow-hidden">
         <div class="pointer-events-none absolute left-0 top-1/2 z-10 h-[130px] w-[130px] -translate-y-1/2 lg:h-[450px] lg:w-[450px]">
@@ -196,6 +252,12 @@ onBeforeUnmount(() => {
                 Households run appliances heavily during the hottest or coolest hours, especially in
                 thermally inefficient homes.
               </p>
+              <RouterLink
+                to="/smart-actions"
+                class="mt-5 inline-flex items-center gap-1 text-base font-semibold text-blue-700 underline-offset-4 transition-colors hover:text-blue-800 hover:underline"
+              >
+                -> Get Smart Actions
+              </RouterLink>
             </div>
 
             <div class="relative mx-auto h-[400px] w-full max-w-[500px]">
@@ -247,6 +309,12 @@ onBeforeUnmount(() => {
                 During peak windows, electricity demand pressures the grid and can increase carbon
                 intensity in the energy mix.
               </p>
+              <RouterLink
+                to="/awareness"
+                class="mt-5 inline-flex items-center gap-1 text-base font-semibold text-blue-700 underline-offset-4 transition-colors hover:text-blue-800 hover:underline"
+              >
+                -> Explore Awareness Dashboard
+              </RouterLink>
             </div>
           </article>
 
@@ -258,6 +326,12 @@ onBeforeUnmount(() => {
                 Rising emissions contribute to hotter conditions and more frequent extreme heat,
                 creating a cycle that further increases cooling demand.
               </p>
+              <RouterLink
+                to="/awareness"
+                class="mt-5 inline-flex items-center gap-1 text-base font-semibold text-blue-700 underline-offset-4 transition-colors hover:text-blue-800 hover:underline"
+              >
+                -> View Chart Analysis
+              </RouterLink>
             </div>
 
             <div class="mx-auto h-[500px] w-full max-w-[600px]">
@@ -270,11 +344,12 @@ onBeforeUnmount(() => {
             </div>
           </article>
         </div>
+
       </div>
     </section>
 
     <!-- Why section: one row, two columns -->
-    <section class="w-full py-6">
+    <section class="w-full py-6 reveal-on-scroll">
       <div class="relative w-full bg-[var(--gb-grid)] min-h-[240px] flex items-center justify-center overflow-hidden mb-20">
         <div class="pointer-events-none absolute left-0 top-1/2 z-10 h-[130px] w-[130px] -translate-y-1/2 lg:h-[450px] lg:w-[450px]">
           <DotLottieVue
@@ -287,7 +362,7 @@ onBeforeUnmount(() => {
         </div>
 
         <h1 class="px-20 text-center text-3xl font-bold tracking-tight text-white lg:px-40 lg:text-5xl">
-          Why does GreenBreeze exists ?
+          Why GreenBreeze Exists
         </h1>
 
         <div class="pointer-events-none absolute right-25 top-1/2 z-10 h-[130px] w-[130px] -translate-y-[60%] lg:h-[200px] lg:w-[200px]">
@@ -320,12 +395,15 @@ onBeforeUnmount(() => {
             GreenBreeze helps households make smarter heating and cooling choices during high-risk
             periods, balancing indoor comfort with lower grid pressure and lower emissions.
           </p>
+          <Button class="mt-6 bg-[var(--gb-electric)] px-7 hover:bg-[#4CBB17] hover:text-white" as-child>
+            <RouterLink to="/smart-actions">See Recommended Actions</RouterLink>
+          </Button>
         </div>
       </div>
     </section>
 
     <!-- How it works section: curved split layout -->
-    <section class="w-full mt-[6rem]">
+    <section class="w-full mt-[6rem] reveal-on-scroll">
       <div class="relative overflow-hidden bg-white pb-20 pt-10 min-h-[760px] lg:pb-28 lg:pt-14 lg:min-h-[650px]">
         <div class="relative z-20 mx-auto max-w-7xl px-6 lg:px-10">
           <h1 class="text-center text-3xl font-bold tracking-tight lg:text-5xl">How It Works</h1>
@@ -366,7 +444,7 @@ onBeforeUnmount(() => {
               />
             </div>
             <h3 class="mt-4 text-xl font-bold lg:text-2xl">
-              Get Forecast + Heatwave Alerts
+              Get Smart Actions + Weather Guidance
             </h3>
           </article>
 
@@ -379,7 +457,7 @@ onBeforeUnmount(() => {
               />
             </div>
             <h3 class="mt-4 text-xl font-bold text-white lg:text-2xl">
-              View Demand + Emissions Awareness
+              View Predictive Analysis
             </h3>
           </article>
         </div>
@@ -388,7 +466,7 @@ onBeforeUnmount(() => {
 
     <!-- CTA section -->
     <section
-      class="relative w-full overflow-hidden py-20 lg:py-45"
+      class="reveal-on-scroll relative w-full overflow-hidden py-20 lg:py-45"
       style="
         background-image:
           linear-gradient(rgba(15, 23, 42, 0.5), rgba(15, 23, 42, 0.5)), url('/cta.jpg');
@@ -398,24 +476,24 @@ onBeforeUnmount(() => {
     >
       <div class="mx-auto max-w-5xl px-6 text-center lg:px-10">
         <h2 class="text-3xl font-bold tracking-tight text-white lg:text-5xl">
-          Ready To Make Smarter Energy Choices?
+          Ready to Turn Daily Choices Into Climate Impact?
         </h2>
         <p class="mx-auto mt-4 max-w-3xl text-[20px] text-[#fef3c7]">
-          Start with your home setup and forecast insights, then explore demand and emissions
-          awareness to plan better heating and cooling decisions.
+          Complete your Home Profile Setup, follow smart actions, and check your predictive analysis before
+          exploring long-term awareness trends.
         </p>
 
         <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
-          <Button size="lg" class="bg-[var(--gb-electric)] px-8 hover:bg-amber-300" as-child>
-            <RouterLink to="/forecast">Start Forecast Setup</RouterLink>
+          <Button size="lg" class="bg-[var(--gb-electric)] px-8 hover:bg-[#4CBB17] hover:text-white" as-child>
+            <RouterLink to="/smart-actions">Start Smart Actions</RouterLink>
           </Button>
           <Button
             size="lg"
             variant="outline"
-            class="border-white/70 bg-white/10 px-8 text-white hover:bg-white/20"
+            class="border-white/70 bg-white/10 px-8 text-white hover:border-[#016601] hover:bg-[#f3f4f6] hover:text-[#016601]"
             as-child
           >
-            <RouterLink to="/awareness">Explore Awareness</RouterLink>
+            <RouterLink to="/forecast">View Predictive Analysis</RouterLink>
           </Button>
         </div>
       </div>
@@ -427,6 +505,116 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+:global(html) {
+  scroll-behavior: smooth;
+}
+
+.hero-shell {
+  position: relative;
+  min-height: calc(100svh - 80px);
+}
+
+.hero-content {
+  min-height: calc(100svh - 150px);
+}
+
+.hero-scroll-cue-wrap {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 40;
+}
+
+.hero-scroll-cue {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  border: 1px solid rgb(15 23 42 / 0.08);
+  background: rgb(255 255 255 / 0.78);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgb(71 85 105);
+  backdrop-filter: blur(6px);
+  transition:
+    border-color 200ms ease,
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+.hero-scroll-cue:hover {
+  border-color: rgb(13 148 136 / 0.24);
+  color: rgb(30 41 59);
+  background: rgb(255 255 255 / 0.92);
+}
+
+.hero-scroll-arrow {
+  display: inline-block;
+  font-size: 12px;
+  animation: cueBob 2.5s ease-in-out infinite;
+}
+
+.hero-bottom-fade {
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 96px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0) 0%, rgb(255 255 255 / 1) 100%);
+}
+
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 760ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 760ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+
+.reveal-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-on-scroll {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .hero-scroll-arrow {
+    animation: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .hero-shell {
+    min-height: auto;
+  }
+
+  .hero-content {
+    min-height: auto;
+    padding-bottom: 5.5rem;
+  }
+}
+
+@keyframes cueBob {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translateY(4px);
+    opacity: 1;
+  }
+}
+
 /* Animation utility: floating motion (left tower) */
 .float-soft {
   animation: floatSoft 4s ease-in-out infinite;

@@ -30,8 +30,12 @@ export interface ForecastSnapshot {
 interface LocationResolveResponse {
   postcode: string
   state: string
-  lat: number
-  lon: number
+  lat?: number
+  lon?: number
+  coordinates?: {
+    lat?: number
+    lon?: number
+  }
 }
 
 interface BackendForecastResponse {
@@ -68,9 +72,14 @@ const round = (value: number) => Math.round(value * 10) / 10
 
 const resolvePostcode = async (postcode: string) => {
   const response = await apiPost<LocationResolveResponse>('/location/resolve', { postcode })
+  const lat = response.coordinates?.lat ?? response.lat
+  const lon = response.coordinates?.lon ?? response.lon
+  if (typeof lat !== 'number' || typeof lon !== 'number') {
+    throw new Error('Invalid location resolve response')
+  }
   return {
-    lat: response.lat,
-    lon: response.lon,
+    lat,
+    lon,
     label: `${response.postcode}, ${response.state}`,
   }
 }
