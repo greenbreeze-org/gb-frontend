@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - prod  
+      - prod
 
 permissions:
   contents: read
@@ -22,22 +22,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build project
         run: npm run build
 
-      - name: Add iteration1 snapshot
+      - name: Add iteration snapshots
         run: |
           mkdir -p dist/iteration1
           cp -R iteration1/* dist/iteration1/
+
+          mkdir -p dist/iteration2
+          cp -R iteration2/* dist/iteration2/
+
+      - name: Debug dist size
+        run: |
+          du -sh dist
+          find dist | wc -l
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -45,14 +56,17 @@ jobs:
           path: ./dist
 
   deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
-    needs: build
-    runs-on: ubuntu-latest
 
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          timeout: 1800000
