@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Imports
-import { Home, LineChart, Leaf, Lightbulb, UserRound } from 'lucide-vue-next'
+import { Home, House, Leaf, Lightbulb } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
@@ -12,7 +12,6 @@ const route = useRoute()
 // Navbar tabs
 const tabs = [
   { label: 'Home', to: '/', icon: Home },
-  { label: 'Forecast', to: '/forecast', icon: LineChart },
   { label: 'Smart Actions', to: '/smart-actions', icon: Lightbulb },
   { label: 'Awareness', to: '/awareness', icon: Leaf },
 ]
@@ -53,8 +52,8 @@ const isActive = computed(() => (to: string) => route.path === to)
           :variant="isActive('/profile-setup') ? 'default' : 'outline'"
           class="h-11 w-11 rounded-full p-0"
         >
-          <RouterLink to="/profile-setup" aria-label="Open profile setup">
-            <UserRound class="h-5 w-5" />
+          <RouterLink to="/profile-setup" aria-label="Open home profile setup">
+            <House class="h-5 w-5" />
           </RouterLink>
         </Button>
       </nav>
