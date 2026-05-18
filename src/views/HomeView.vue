@@ -107,7 +107,7 @@ onBeforeUnmount(() => {
               class="bg-[var(--gb-electric)] px-7 hover:bg-[#4CBB17] hover:text-white"
               as-child
             >
-              <RouterLink to="/smart-actions">Start Smart Actions</RouterLink>
+              <RouterLink to="/smart-actions">Set Up My Home Profile</RouterLink>
             </Button>
             <Button
               size="lg"
@@ -115,12 +115,12 @@ onBeforeUnmount(() => {
               class="px-7 hover:border-[#016601] hover:text-[#016601] hover:bg-[#f3f4f6]"
               as-child
             >
-              <RouterLink to="/profile-setup">Set Up My Home Profile</RouterLink>
+              <RouterLink to="/awareness">Make myself aware</RouterLink>
             </Button>
           </div>
 
           <p class="mt-4 text-sm font-semibold text-slate-600">
-            New here? Start with Smart Actions after profile setup.
+            New here? Start with your Home Profile Setup.
           </p>
         </div>
 
@@ -327,10 +327,10 @@ onBeforeUnmount(() => {
                 creating a cycle that further increases cooling demand.
               </p>
               <RouterLink
-                to="/forecast"
+                to="/awareness"
                 class="mt-5 inline-flex items-center gap-1 text-base font-semibold text-blue-700 underline-offset-4 transition-colors hover:text-blue-800 hover:underline"
               >
-                -> View Predictive Analysis
+                -> View Chart Analysis
               </RouterLink>
             </div>
 
@@ -479,7 +479,7 @@ onBeforeUnmount(() => {
           Ready to Turn Daily Choices Into Climate Impact?
         </h2>
         <p class="mx-auto mt-4 max-w-3xl text-[20px] text-[#fef3c7]">
-          Set up your profile, follow smart actions, and check your predictive analysis before
+          Complete your Home Profile Setup, follow smart actions, and check your predictive analysis before
           exploring long-term awareness trends.
         </p>
 
