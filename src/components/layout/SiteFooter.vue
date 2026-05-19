@@ -19,6 +19,12 @@
         <p class="text-xs font-bold uppercase tracking-[0.16em] text-white/75">Location</p>
         <p class="mt-2 text-sm font-semibold text-white/95">Melbourne, Victoria</p>
         <p class="mt-1 text-sm font-semibold text-white/95">Australia</p>
+        <RouterLink
+          to="/privacy-policy"
+          class="mt-2 inline-block text-sm font-semibold text-white/95 underline underline-offset-4 transition hover:text-white"
+        >
+          Privacy Policy
+        </RouterLink>
       </div>
     </div>
 

@@ -21,11 +21,9 @@ import SiteHeader from '@/components/layout/SiteHeader.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  fetchAwarenessOverview,
   fetchDemandInsights,
   fetchEmissionInsights,
   fetchLiveGridSummary,
-  type AwarenessOverview,
   type DemandInsights,
   type EmissionInsights,
   type LiveGridSummary,
@@ -46,7 +44,6 @@ const loading = ref(false)
 const liveSummary = ref<LiveGridSummary | null>(null)
 const demandInsights = ref<DemandInsights | null>(null)
 const emissionsInsights = ref<EmissionInsights | null>(null)
-const overviewInsights = ref<AwarenessOverview | null>(null)
 
 const round = (value: number, digits = 2) => Number(value.toFixed(digits))
 
@@ -193,23 +190,6 @@ const buildFallbackEmissionInsights = (
   }
 }
 
-const buildFallbackOverview = (
-  live: LiveGridSummary,
-  demand: DemandInsights,
-  emissions: EmissionInsights,
-): AwarenessOverview => ({
-  generated_at: new Date().toISOString(),
-  headline: `Current VIC grid status: ${live.current_signal ?? 'AMBER'}.`,
-  key_messages: [
-    `Current renewables share is ${round(live.latest?.renewables_pct ?? 0, 2)}% in VIC.`,
-    `Peak energy demand in the last ${demand.lookback_days} days reached ${round(demand.peak_energy_mwh ?? 0, 2)} MWh.`,
-    `Current emission intensity is ${round(emissions.current_emission_intensity ?? 0, 2)} (lower is cleaner).`,
-  ],
-  live_grid: live,
-  demand,
-  emissions,
-})
-
 const scrollToId = (id: string) => {
   const target = document.getElementById(id)
   if (!target) return
@@ -257,17 +237,15 @@ const loadAwarenessData = async () => {
   loading.value = true
 
   try {
-    const [live, demand, emissions, overview] = await Promise.all([
+    const [live, demand, emissions] = await Promise.all([
       fetchLiveGridSummary(liveHours.value),
       fetchDemandInsights(historicalDays.value),
       fetchEmissionInsights(historicalDays.value),
-      fetchAwarenessOverview(liveHours.value, historicalDays.value),
     ])
 
     liveSummary.value = live
     demandInsights.value = demand
     emissionsInsights.value = emissions
-    overviewInsights.value = overview
   } catch (error) {
     console.warn('Awareness API request failed; using static fallback dataset.', error)
 
@@ -277,12 +255,10 @@ const loadAwarenessData = async () => {
       historicalDays.value,
       fallbackDemand.demand_series,
     )
-    const fallbackOverview = buildFallbackOverview(fallbackLive, fallbackDemand, fallbackEmissions)
 
     liveSummary.value = fallbackLive
     demandInsights.value = fallbackDemand
     emissionsInsights.value = fallbackEmissions
-    overviewInsights.value = fallbackOverview
   } finally {
     loading.value = false
   }
@@ -545,17 +521,6 @@ const emissionsChartOptions = computed<ChartOptions<'line'>>(() => ({
   },
 }))
 
-const overviewMessages = computed(() => {
-  const raw = overviewInsights.value?.key_messages ?? []
-  return raw.slice(0, 3)
-})
-
-const generatedAtLabel = computed(() => {
-  const generatedAt = overviewInsights.value?.generated_at
-  if (!generatedAt) return 'N/A'
-  return formatHourLabel(generatedAt)
-})
-
 onMounted(async () => {
   await loadAwarenessData()
 })
@@ -589,9 +554,9 @@ onMounted(async () => {
             type="button"
             variant="outline"
             class="border-[var(--gb-grid)] px-6 text-[var(--gb-grid)] hover:bg-emerald-50"
-            @click="scrollToId('overview-section')"
+            @click="scrollToId('demand-section')"
           >
-            Jump To Overview
+            Jump To Demand
           </Button>
         </div>
       </div>
@@ -613,53 +578,6 @@ onMounted(async () => {
   </section>
 
   <main class="mx-auto max-w-7xl space-y-8 px-6 py-8 pb-40 lg:px-10">
-
-    <div id="overview-section" class="full-bleed relative mt-6 min-h-[200px] bg-[var(--gb-grid)] flex items-center justify-center overflow-hidden">
-      <div class="pointer-events-none absolute left-0 top-1/2 z-10 h-[120px] w-[120px] -translate-y-1/2 lg:h-[320px] lg:w-[320px]">
-        <DotLottieVue
-          src="/lottie/decor/cherry-flowers.lottie"
-          :render-config="{ devicePixelRatio: 2, autoResize: true }"
-          autoplay
-          loop
-          style="width: 100%; height: 100%"
-        />
-      </div>
-      <h2 class="px-8 text-center text-3xl font-extrabold tracking-tight text-white lg:text-5xl">Overview</h2>
-      <div class="pointer-events-none absolute right-20 top-1/2 z-10 h-[120px] w-[120px] -translate-y-[58%] lg:h-[170px] lg:w-[170px]">
-        <DotLottieVue
-          src="/lottie/decor/bulb.lottie"
-          :render-config="{ devicePixelRatio: 2, autoResize: true }"
-          autoplay
-          loop
-          style="width: 100%; height: 100%"
-        />
-      </div>
-    </div>
-
-    <section class="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-      <Card class="border border-slate-200 bg-white shadow-sm">
-        <CardHeader>
-          <CardTitle class="text-2xl font-extrabold text-[var(--gb-grid)]">{{ overviewInsights?.headline || 'Overview unavailable.' }}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p class="text-sm leading-relaxed text-slate-700">
-            This snapshot blends live-grid and historical trends so you can act on timing, demand, and emissions in one place.
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card class="border border-slate-200 bg-slate-50 shadow-sm">
-        <CardHeader>
-          <CardTitle class="text-lg font-extrabold">Key Insights</CardTitle>
-        </CardHeader>
-        <CardContent class="space-y-3">
-          <p v-for="(message, index) in overviewMessages" :key="`insight-${index}`" class="rounded-xl border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700">
-            {{ message }}
-          </p>
-          <p v-if="!overviewMessages.length" class="text-sm font-semibold text-slate-600">No overview insights available.</p>
-        </CardContent>
-      </Card>
-    </section>
 
     <div id="live-grid-section" class="full-bleed relative mt-6 min-h-[200px] bg-[var(--gb-grid)] flex items-center justify-center overflow-hidden">
       <div class="pointer-events-none absolute left-0 top-1/2 z-10 h-[120px] w-[120px] -translate-y-1/2 lg:h-[320px] lg:w-[320px]">

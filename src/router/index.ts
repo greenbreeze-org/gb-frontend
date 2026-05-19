@@ -3,6 +3,7 @@ import AccessGateView from '@/views/AccessGateView.vue'
 import AwarenessView from '@/views/AwarenessView.vue'
 import ForecastView from '@/views/ForecastView.vue'
 import HomeView from '@/views/HomeView.vue'
+import PrivacyPolicyView from '@/views/PrivacyPolicyView.vue'
 import ProfileSetupView from '@/views/ProfileSetupView.vue'
 import SmartActionsView from '@/views/SmartActionsView.vue'
 
@@ -50,6 +51,11 @@ const router = createRouter({
       path: '/smart-actions',
       name: 'smart-actions',
       component: SmartActionsView,
+    },
+    {
+      path: '/privacy-policy',
+      name: 'privacy-policy',
+      component: PrivacyPolicyView,
     },
   ],
 })
