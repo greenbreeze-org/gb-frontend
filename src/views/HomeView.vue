@@ -493,7 +493,7 @@ onBeforeUnmount(() => {
             class="border-white/70 bg-white/10 px-8 text-white hover:border-[#016601] hover:bg-[#f3f4f6] hover:text-[#016601]"
             as-child
           >
-            <RouterLink to="/forecast">View Predictive Analysis</RouterLink>
+            <RouterLink to="/awareness">View Energy-Emissions Analysis</RouterLink>
           </Button>
         </div>
       </div>
