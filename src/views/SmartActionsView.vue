@@ -17,14 +17,23 @@ import {
   loadSharedLocationState,
   loadStoredProfileSetup,
   mapToSmartActionsPayload,
+  type ApplianceType,
   SMART_ACTIONS_RESPONSE_KEY,
   SMART_ACTIONS_UNLOCKED_KEY,
+  type WallType,
 } from '@/services/profileSetup'
 import {
+  fetchSmartActionsImpactProjections,
   fetchSmartActionsRecommendations,
+  type ImpactProjectionResponse,
   type SmartActionRecommendation,
   type SmartActionsResponse,
 } from '@/services/smartActions'
+import {
+  listDailyImpactSnapshots,
+  upsertDailyImpactSnapshot,
+  type DailyImpactSnapshot,
+} from '@/services/impactHistoryDb'
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -37,6 +46,9 @@ const flippedCards = ref<boolean[]>([])
 const selectedActionItems = ref<string[]>([])
 const impactMode = ref<'climate' | 'money'>('climate')
 const impactAnimationProgress = ref(0)
+const projectionResponse = ref<ImpactProjectionResponse | null>(null)
+const projectionError = ref('')
+const isProjectionLoading = ref(false)
 let impactAnimationFrame: number | null = null
 let impactPreludeInterval: number | null = null
 let impactPreludeFinishTimeout: number | null = null
@@ -448,7 +460,7 @@ const missedImpact = computed(() => ({
   peak: potentialImpact.value.peak - realizedImpact.value.peak,
 }))
 
-const monthlySeries = computed(() => {
+const localMonthlySeries = computed(() => {
   const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   const start = new Date()
   start.setHours(0, 0, 0, 0)
@@ -481,6 +493,39 @@ const monthlySeries = computed(() => {
     value: Number(s.value.toFixed(2)),
     heightPct: Math.max(16, Math.round((s.value / max) * 100)),
   }))
+})
+
+const projectionSeries = computed(() => {
+  const projections = projectionResponse.value?.projections ?? []
+  if (!projections.length) return []
+
+  const rows = projections.slice(0, 7).map((item) => {
+    const date = new Date(item.date)
+    const label = Number.isNaN(date.getTime())
+      ? item.date.slice(0, 3)
+      : date.toLocaleDateString('en-AU', { weekday: 'short' })
+
+    const value =
+      impactMode.value === 'climate'
+        ? Number(item.impact.avoided_emissions_kg_co2 ?? 0)
+        : Number(item.impact.estimated_savings_aud ?? 0)
+
+    return {
+      label,
+      value: Number.isFinite(value) ? value : 0,
+    }
+  })
+
+  const max = Math.max(...rows.map((row) => row.value), 1)
+  return rows.map((row) => ({
+    label: row.label,
+    value: Number(row.value.toFixed(2)),
+    heightPct: Math.max(16, Math.round((row.value / max) * 100)),
+  }))
+})
+
+const monthlySeries = computed(() => {
+  return projectionSeries.value.length ? projectionSeries.value : localMonthlySeries.value
 })
 
 const yesterdayBaseline = {
@@ -966,8 +1011,14 @@ const loadForecastBlocks = async () => {
 }
 
 const scrollToActionFlow = () => {
-  const section = document.getElementById('recommendations-banner')
-  section?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const targetId = !isUnlocked.value ? 'setup-gate-card' : 'recommendations-banner'
+  const section = document.getElementById(targetId)
+  if (section) {
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    return
+  }
+  const fallback = document.getElementById('smart-actions-flow')
+  fallback?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 const scrollToRecommendationCards = () => {
@@ -1032,6 +1083,11 @@ const impactPreludeMessages = [
   'Ready to go...',
 ]
 
+const MELBOURNE_FALLBACK_COORDS = {
+  lat: -37.8136,
+  lon: 144.9631,
+}
+
 const clearImpactPreludeTimers = () => {
   if (impactPreludeInterval) {
     clearInterval(impactPreludeInterval)
@@ -1043,18 +1099,194 @@ const clearImpactPreludeTimers = () => {
   }
 }
 
+const computeImpactTotalsFromIds = (selectedIds: string[]) => {
+  const selectedSet = new Set(selectedIds)
+  return actionItems.value.reduce(
+    (acc, item) => {
+      if (!selectedSet.has(item.id)) return acc
+      acc.kwh += item.impact.kwh
+      acc.co2 += item.impact.co2
+      acc.peak += item.impact.peak
+      acc.money += item.impact.money
+      return acc
+    },
+    { kwh: 0, co2: 0, peak: 0, money: 0 },
+  )
+}
+
+const getDateKey = (date = new Date()) => {
+  const yyyy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
+const buildHouseProfileForProjection = (): {
+  house_material: WallType
+  appliances: ApplianceType[]
+} => {
+  const setup = loadStoredProfileSetup()
+  const mapped = setup ? mapToSmartActionsPayload(setup) : null
+  const fallbackMaterial = (apiResponse.value as SmartActionsResponseExtended | null)?.house_material
+  const fallbackAppliances = Array.from(
+    new Set(
+      (apiResponse.value?.recommendations ?? [])
+        .map((rec) => rec.appliance)
+        .filter(Boolean) as ApplianceType[],
+    ),
+  )
+
+  return {
+    house_material: mapped?.house_material ?? (fallbackMaterial as WallType) ?? 'brick_veneer',
+    appliances: mapped?.appliances?.length
+      ? mapped.appliances
+      : fallbackAppliances.length
+        ? fallbackAppliances
+        : ['reverse_cycle_split'],
+  }
+}
+
+const resolveProjectionCoordinates = async () => {
+  if (locationCoords.value) {
+    return {
+      lat: locationCoords.value.lat,
+      lon: locationCoords.value.lon,
+    }
+  }
+
+  const setup = loadStoredProfileSetup()
+  const mapped = setup ? mapToSmartActionsPayload(setup) : null
+  const postcode = mapped?.postcode ?? activeFallbackPostcode.value.trim()
+
+  if (postcode && /^\d{4}$/.test(postcode)) {
+    try {
+      const resolved = await apiPost<LocationResolveResponse>('/location/resolve', { postcode })
+      const lat = resolved.coordinates?.lat ?? resolved.lat
+      const lon = resolved.coordinates?.lon ?? resolved.lon
+      if (typeof lat === 'number' && typeof lon === 'number') {
+        return { lat, lon }
+      }
+    } catch {
+      // fall through to Melbourne fallback
+    }
+  }
+
+  return MELBOURNE_FALLBACK_COORDS
+}
+
+const upsertTodayImpactHistory = async (impact: {
+  avoided_kwh: number
+  avoided_emissions_kg_co2: number
+  peak_reduction_pct: number
+  estimated_savings_aud: number
+}) => {
+  const dateKey = getDateKey()
+  const houseProfile = buildHouseProfileForProjection()
+  const snapshot: DailyImpactSnapshot = {
+    dateKey,
+    date: new Date().toISOString(),
+    house_profile: houseProfile,
+    impact,
+  }
+  await upsertDailyImpactSnapshot(snapshot)
+
+  // Demo seeding: always ensure previous 4 days exist as dummy history.
+  // Current day remains real user behavior and becomes day 5.
+  const history = await listDailyImpactSnapshots()
+  const existingKeys = new Set(history.map((row) => row.dateKey))
+  const dummyByDay = [
+    { daysAgo: 4, impact: { avoided_kwh: 1.72, avoided_emissions_kg_co2: 1.359, peak_reduction_pct: 22, estimated_savings_aud: 0.51 } },
+    { daysAgo: 3, impact: { avoided_kwh: 2.08, avoided_emissions_kg_co2: 1.643, peak_reduction_pct: 29, estimated_savings_aud: 0.63 } },
+    { daysAgo: 2, impact: { avoided_kwh: 2.44, avoided_emissions_kg_co2: 1.928, peak_reduction_pct: 35, estimated_savings_aud: 0.74 } },
+    { daysAgo: 1, impact: { avoided_kwh: 2.81, avoided_emissions_kg_co2: 2.22, peak_reduction_pct: 41, estimated_savings_aud: 0.85 } },
+  ]
+
+  for (const seed of dummyByDay) {
+    const d = new Date()
+    d.setHours(12, 0, 0, 0)
+    d.setDate(d.getDate() - seed.daysAgo)
+    const key = getDateKey(d)
+    if (existingKeys.has(key)) continue
+
+    await upsertDailyImpactSnapshot({
+      dateKey: key,
+      date: d.toISOString(),
+      house_profile: houseProfile,
+      impact: seed.impact,
+    })
+  }
+}
+
+const runImpactProjection = async () => {
+  isProjectionLoading.value = true
+  projectionError.value = ''
+
+  try {
+    const coordinates = await resolveProjectionCoordinates()
+    const houseProfile = buildHouseProfileForProjection()
+    const history = await listDailyImpactSnapshots()
+
+    const response = await fetchSmartActionsImpactProjections({
+      coordinates,
+      house_profile: houseProfile,
+      past_7day_impacts: history.map((row) => ({
+        date: row.date,
+        impact: {
+          avoided_kwh: row.impact.avoided_kwh,
+          avoided_emissions_kg_co2: row.impact.avoided_emissions_kg_co2,
+          peak_reduction_pct: row.impact.peak_reduction_pct,
+          estimated_savings_aud: row.impact.estimated_savings_aud,
+          real_world_equivalents: [],
+          money_equivalents: [],
+        },
+      })),
+    })
+
+    projectionResponse.value = response
+  } catch {
+    projectionError.value = 'Projection API unavailable. Showing local fallback chart.'
+    projectionResponse.value = null
+  } finally {
+    isProjectionLoading.value = false
+  }
+}
+
 const startImpactPreludeFlow = async () => {
+  await nextTick()
+  clearImpactPreludeTimers()
+  impactPreludeActive.value = false
+  impactPreludeDone.value = false
+  impactPreludeIndex.value = 0
+
+  const selectedIds = [...selectedActionItems.value]
+  const hasSelected = selectedIds.length > 0
+  const latestTotals = computeImpactTotalsFromIds(selectedIds)
+
   showImpactSummary.value = true
-  if (!hasSelection.value) {
+
+  try {
+    await upsertTodayImpactHistory({
+      avoided_kwh: hasSelected ? latestTotals.kwh : 0,
+      avoided_emissions_kg_co2: hasSelected ? latestTotals.co2 : 0,
+      peak_reduction_pct: hasSelected ? latestTotals.peak : 0,
+      estimated_savings_aud: hasSelected ? latestTotals.money : 0,
+    })
+  } catch {
+    // Keep the UX moving even if browser storage is unavailable.
+  }
+
+  if (!hasSelected) {
+    projectionResponse.value = null
+    projectionError.value = ''
+    isProjectionLoading.value = false
     await nextTick()
     scrollToNoSelectionState()
     return
   }
 
-  clearImpactPreludeTimers()
-  impactPreludeDone.value = false
+  void runImpactProjection()
+
   impactPreludeActive.value = true
-  impactPreludeIndex.value = 0
 
   await nextTick()
   scrollToImpactPrelude()
@@ -1441,6 +1673,7 @@ onBeforeUnmount(() => {
     <main id="smart-actions-flow" class="mx-auto flex w-full max-w-5xl flex-col items-center px-6 py-10 text-center lg:px-10">
       <Card
         v-if="!isUnlocked"
+        id="setup-gate-card"
         class="setup-modern-card mt-10 w-full max-w-4xl overflow-hidden text-left"
       >
         <div class="grid items-stretch gap-0 md:grid-cols-[1.05fr_1.35fr]">
@@ -1681,7 +1914,7 @@ onBeforeUnmount(() => {
                       <td class="px-4 py-3">
                         <Checkbox
                           :model-value="selectedActionItems.includes(item.id)"
-                          @update:model-value="(checked) => toggleActionItem(item.id, Boolean(checked))"
+                          @update:model-value="(checked) => toggleActionItem(item.id, checked === true)"
                         />
                       </td>
                       <td class="px-8 py-3 text-sm font-semibold text-slate-700">
@@ -1952,6 +2185,12 @@ onBeforeUnmount(() => {
                 </h4>
                 <p class="text-center text-xs font-semibold text-slate-500">
                   Based on your current completion rate
+                </p>
+                <p v-if="isProjectionLoading" class="text-center text-xs font-semibold text-slate-500">
+                  Updating 7-day projection...
+                </p>
+                <p v-else-if="projectionError" class="text-center text-xs font-semibold text-amber-700">
+                  {{ projectionError }}
                 </p>
               </div>
               <div class="grid grid-cols-7 gap-4">
