@@ -55,8 +55,49 @@ export interface SmartActionsPayload {
   postcode: string
 }
 
+export interface ImpactProjectionRequest {
+  coordinates: {
+    lat: number
+    lon: number
+  }
+  house_profile: {
+    house_material: WallType
+    appliances: ApplianceType[]
+  }
+  past_7day_impacts: Array<{
+    date: string
+    impact: {
+      avoided_kwh: number
+      avoided_emissions_kg_co2: number
+      peak_reduction_pct: number
+      estimated_savings_aud: number
+      real_world_equivalents: SmartActionEquivalent[]
+      money_equivalents: SmartActionEquivalent[]
+    }
+  }>
+}
+
+export interface ImpactProjectionResponse {
+  projections: Array<{
+    date: string
+    impact: {
+      avoided_kwh?: number
+      avoided_emissions_kg_co2?: number
+      peak_reduction_pct?: number
+      estimated_savings_aud?: number
+    }
+  }>
+  total_7day_co2_kg?: number
+}
+
 export const fetchSmartActionsRecommendations = async (
   payload: SmartActionsPayload,
 ): Promise<SmartActionsResponse> => {
   return apiPost<SmartActionsResponse>('/smart-actions/recommendations', payload)
+}
+
+export const fetchSmartActionsImpactProjections = async (
+  payload: ImpactProjectionRequest,
+): Promise<ImpactProjectionResponse> => {
+  return apiPost<ImpactProjectionResponse>('/smart-actions/impact-projections', payload)
 }
