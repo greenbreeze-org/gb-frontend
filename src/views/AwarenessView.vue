@@ -699,6 +699,9 @@ watch(historicalDays, async () => {
               </div>
             </div>
           </div>
+          <p class="text-sm font-semibold text-slate-600">
+            Live snapshot: Victoria-wide grid mix and intensity over the last {{ liveHours }} hours (Australia/Melbourne time).
+          </p>
         </CardHeader>
         <CardContent>
           <div class="h-[340px]">
