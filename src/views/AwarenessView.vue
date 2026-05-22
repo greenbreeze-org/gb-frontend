@@ -235,6 +235,24 @@ const shortTimeLabel = (value: string) => {
   })
 }
 
+const shortDateLabel = (value: string) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('en-AU', {
+    month: 'short',
+    day: '2-digit',
+    timeZone: 'Australia/Melbourne',
+  })
+}
+
+const signalStrengthLabel = computed(() => {
+  const signal = (liveSummary.value?.current_signal ?? liveSummary.value?.latest?.grid_signal ?? '').toUpperCase()
+  if (signal === 'GREEN') return 'Low'
+  if (signal === 'AMBER' || signal === 'YELLOW') return 'Medium'
+  if (signal === 'RED') return 'Very High'
+  return 'Unknown'
+})
+
 const loadAwarenessData = async () => {
   loading.value = true
 
@@ -359,7 +377,7 @@ const liveChartOptions = computed<ChartOptions<'line'>>(() => ({
 }))
 
 const demandSeries = computed(() => demandInsights.value?.demand_series ?? [])
-const demandLabels = computed(() => demandSeries.value.map((point) => shortTimeLabel(point.timestamp)))
+const demandLabels = computed(() => demandSeries.value.map((point) => shortDateLabel(point.timestamp)))
 
 const demandChartData = computed<ChartData<'line'>>(() => ({
   labels: demandLabels.value,
@@ -460,7 +478,7 @@ const demandChartOptions = computed<ChartOptions<'line'>>(() => ({
 }))
 
 const emissionsSeries = computed(() => emissionsInsights.value?.emission_series ?? [])
-const emissionsLabels = computed(() => emissionsSeries.value.map((point) => shortTimeLabel(point.timestamp)))
+const emissionsLabels = computed(() => emissionsSeries.value.map((point) => shortDateLabel(point.timestamp)))
 
 const emissionsChartData = computed<ChartData<'line'>>(() => {
   const isIntensity = emissionMetric.value === 'intensity'
@@ -608,7 +626,9 @@ watch(historicalDays, async () => {
           style="width: 100%; height: 100%"
         />
       </div>
-      <h2 class="px-8 text-center text-3xl font-extrabold tracking-tight text-white lg:text-5xl">Live Grid</h2>
+      <h2 class="px-8 text-center text-3xl font-extrabold tracking-tight text-white lg:text-5xl">
+        Live Grid (Victoria mix/intensity)
+      </h2>
       <div class="pointer-events-none absolute right-20 top-1/2 z-10 h-[120px] w-[120px] -translate-y-[58%] lg:h-[170px] lg:w-[170px]">
         <DotLottieVue
           src="/lottie/decor/bulb.lottie"
@@ -629,6 +649,7 @@ watch(historicalDays, async () => {
               <Zap class="h-3.5 w-3.5" />
               {{ liveSummary?.current_signal || liveSummary?.latest?.grid_signal || 'N/A' }}
             </div>
+            <p class="mt-2 text-xs font-semibold text-slate-500">{{ signalStrengthLabel }}</p>
           </CardContent>
         </Card>
 
@@ -699,9 +720,6 @@ watch(historicalDays, async () => {
               </div>
             </div>
           </div>
-          <p class="text-sm font-semibold text-slate-600">
-            Live snapshot: Victoria-wide grid mix and intensity over the last {{ liveHours }} hours (Australia/Melbourne time).
-          </p>
         </CardHeader>
         <CardContent>
           <div class="h-[340px]">
@@ -721,7 +739,9 @@ watch(historicalDays, async () => {
           style="width: 100%; height: 100%"
         />
       </div>
-      <h2 class="px-8 text-center text-3xl font-extrabold tracking-tight text-white lg:text-5xl">Demand</h2>
+      <h2 class="px-8 text-center text-3xl font-extrabold tracking-tight text-white lg:text-5xl">
+        Demand (Victoria trend)
+      </h2>
       <div class="pointer-events-none absolute right-20 top-1/2 z-10 h-[120px] w-[120px] -translate-y-[58%] lg:h-[170px] lg:w-[170px]">
         <DotLottieVue
           src="/lottie/decor/bulb.lottie"
@@ -773,7 +793,7 @@ watch(historicalDays, async () => {
         <CardHeader>
           <div class="flex flex-wrap items-center justify-between gap-3">
             <CardTitle class="text-xl font-extrabold">Demand + Temperature Context</CardTitle>
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex flex-wrap items-center gap-3 md:gap-4">
               <div class="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
                 <button
                   v-for="option in [14, 30, 60]"
@@ -818,9 +838,6 @@ watch(historicalDays, async () => {
               </div>
             </div>
           </div>
-          <p class="text-sm font-semibold text-slate-600">
-            Historical dataset: Victoria-wide demand trends over the last {{ historicalDays }} days (Australia/Melbourne time).
-          </p>
         </CardHeader>
         <CardContent>
           <div class="h-[360px]">
@@ -840,7 +857,9 @@ watch(historicalDays, async () => {
           style="width: 100%; height: 100%"
         />
       </div>
-      <h2 class="px-8 text-center text-3xl font-extrabold tracking-tight text-white lg:text-5xl">Emissions</h2>
+      <h2 class="px-8 text-center text-3xl font-extrabold tracking-tight text-white lg:text-5xl">
+        Emissions (Victoria trend)
+      </h2>
       <div class="pointer-events-none absolute right-20 top-1/2 z-10 h-[120px] w-[120px] -translate-y-[58%] lg:h-[170px] lg:w-[170px]">
         <DotLottieVue
           src="/lottie/decor/bulb.lottie"
@@ -891,7 +910,7 @@ watch(historicalDays, async () => {
           <CardHeader class="pb-2">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <CardTitle class="text-xl font-extrabold">Emission Trend</CardTitle>
-              <div class="flex flex-wrap items-center gap-2">
+              <div class="flex flex-wrap items-center gap-3 md:gap-4">
                 <div class="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
                   <button
                     v-for="option in [14, 30, 60]"
@@ -924,9 +943,6 @@ watch(historicalDays, async () => {
                 </div>
               </div>
             </div>
-            <p class="text-sm font-semibold text-slate-600">
-              Historical dataset: Victoria-wide emissions trends over the last {{ historicalDays }} days (Australia/Melbourne time).
-            </p>
           </CardHeader>
           <CardContent>
             <div class="h-[360px]">
