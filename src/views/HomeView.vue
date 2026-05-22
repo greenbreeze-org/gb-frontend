@@ -14,10 +14,15 @@ const earthLottieRef = ref<DotLottieVueInstance | null>(null)
 const houseLottieRef = ref<DotLottieVueInstance | null>(null)
 const cleanupFns: Array<() => void> = []
 const storySectionRef = ref<HTMLElement | null>(null)
+const climateSectionRef = ref<HTMLElement | null>(null)
 let revealObserver: IntersectionObserver | null = null
 
 const scrollToStorySection = () => {
   storySectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+const scrollToClimateSection = () => {
+  climateSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 // Hold one-time lottie animations on a visible frame (avoid ending on blank frame)
@@ -62,8 +67,8 @@ onMounted(() => {
       })
     },
     {
-      threshold: 0.18,
-      rootMargin: '0px 0px -8% 0px',
+      threshold: 0.08,
+      rootMargin: '0px 0px -2% 0px',
     },
   )
 
@@ -113,9 +118,10 @@ onBeforeUnmount(() => {
               size="lg"
               variant="outline"
               class="px-7 hover:border-[#016601] hover:text-[#016601] hover:bg-[#f3f4f6]"
-              as-child
+              type="button"
+              @click="scrollToStorySection"
             >
-              <RouterLink to="/awareness">Make myself aware</RouterLink>
+              Learn More
             </Button>
           </div>
 
@@ -212,10 +218,9 @@ onBeforeUnmount(() => {
       <div class="hero-bottom-fade" aria-hidden="true"></div>
     </section>
 
-    <!-- Story section: cause and impact chain -->
-    <section ref="storySectionRef" class="w-full py-4 reveal-on-scroll">
-      <!-- Story section: heading -->
-      <div class="relative w-full bg-[var(--gb-grid)] min-h-[240px] flex items-center justify-center overflow-hidden">
+    <!-- Why section -->
+    <section ref="storySectionRef" class="w-full py-6 reveal-on-scroll bg-[#EAF7EE]">
+      <div class="relative w-full min-h-[220px] flex items-center justify-center overflow-hidden mb-20">
         <div class="pointer-events-none absolute left-0 top-1/2 z-10 h-[130px] w-[130px] -translate-y-1/2 lg:h-[450px] lg:w-[450px]">
           <DotLottieVue
             src="/lottie/decor/cherry-flowers.lottie"
@@ -226,7 +231,97 @@ onBeforeUnmount(() => {
           />
         </div>
 
-        <h1 class="px-20 text-center text-3xl font-bold tracking-tight text-white lg:px-40 lg:text-5xl">
+        <h1 class="px-20 text-center text-3xl font-bold tracking-tight text-[var(--gb-grid)] lg:px-40 lg:text-[2.7rem]">
+          Why GreenBreeze Exists
+        </h1>
+
+        <div class="pointer-events-none absolute right-25 top-1/2 z-10 h-[130px] w-[130px] -translate-y-[60%] lg:h-[200px] lg:w-[200px]">
+          <DotLottieVue
+            src="/lottie/decor/bulb.lottie"
+            :render-config="{ devicePixelRatio: 2, autoResize: true }"
+            autoplay
+            loop
+            style="width: 100%; height: 100%"
+          />
+        </div>
+      </div>
+
+      <div class="mx-auto max-w-7xl space-y-14 px-6 lg:px-10">
+        <!-- Why row 1: who it's for -->
+        <article class="grid items-center gap-10 lg:grid-cols-2">
+          <div class="mx-auto w-full max-w-[430px]">
+            <img
+              src="/Degree-amico.svg"
+              alt="A person feeling tired managing indoor home temperature"
+              class="h-auto w-full object-contain"
+            />
+          </div>
+
+          <div>
+            <h3 class="text-xl font-bold text-[#1F4F4A] lg:text-3xl">
+              Who is this for?
+            </h3>
+            <ul class="mt-4 space-y-3 text-[18px] lg:text-[19px]">
+              <li>1. Is your <strong class="font-semibold text-[#B54141]">indoor comfort</strong> hard to manage across the day?</li>
+              <li>2. Does your home <strong class="font-semibold text-[#B54141]">heat up or cool down too quickly</strong>?</li>
+              <li>3. Do <strong class="font-semibold text-[#B54141]">peak-time electricity costs</strong> worry you when comfort matters most?</li>
+              <li>4. Do you want to <strong class="font-semibold text-[#B54141]">reduce climate risk</strong> while keeping your home livable?</li>
+            </ul>
+            <button
+              type="button"
+              class="mt-5 inline-flex items-center gap-1 text-base font-semibold text-blue-700 underline-offset-4 transition-colors hover:text-blue-800 hover:underline"
+              @click="scrollToClimateSection"
+            >
+              -> See how peak electricity affects climate
+            </button>
+          </div>
+        </article>
+
+        <!-- Why row 2: solution -->
+        <div class="relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] w-screen bg-white px-6 py-10">
+          <article class="mx-auto grid w-full max-w-7xl items-center gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:px-10">
+            <div class="lg:pr-2">
+            <h3 class="text-xl font-bold text-[#1F4F4A] lg:text-3xl">
+              Avoid worst peak windows. Keep homes comfortable. Reduce climate impact.
+            </h3>
+            <ul class="mt-4 space-y-3 text-[18px] lg:text-[19px]">
+              <li>1. Get <strong class="font-semibold text-[#B54141]">clear, timed actions</strong> before high-risk windows.</li>
+              <li>2. Shift energy use away from <strong class="font-semibold text-[#B54141]">costly peak windows</strong> while keeping comfort.</li>
+              <li>3. Follow <strong class="font-semibold text-[#B54141]">practical recommendations</strong> built for real home conditions.</li>
+              <li>4. Lower <strong class="font-semibold text-[#B54141]">household emissions</strong> and help reduce grid pressure.</li>
+            </ul>
+            <Button class="mt-6 bg-[var(--gb-electric)] px-7 hover:bg-[#4CBB17] hover:text-white" as-child>
+              <RouterLink to="/smart-actions">Get Smart Actions</RouterLink>
+            </Button>
+            </div>
+
+            <div class="mx-auto w-full max-w-[460px]">
+              <img
+                src="/Smart home-amico.svg"
+                alt="Smart home heating and cooling control interface"
+                class="h-auto w-full object-contain"
+              />
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Story section: cause and impact chain -->
+    <section ref="climateSectionRef" class="w-full py-4 reveal-on-scroll bg-[#EAF7EE]">
+      <!-- Story section: heading -->
+      <div class="relative w-full min-h-[240px] flex items-center justify-center overflow-hidden">
+        <div class="pointer-events-none absolute left-0 top-1/2 z-10 h-[130px] w-[130px] -translate-y-1/2 lg:h-[450px] lg:w-[450px]">
+          <DotLottieVue
+            src="/lottie/decor/cherry-flowers.lottie"
+            :render-config="{ devicePixelRatio: 2, autoResize: true }"
+            autoplay
+            loop
+            style="width: 100%; height: 100%"
+          />
+        </div>
+
+        <h1 class="px-20 text-center text-3xl font-bold tracking-tight text-[var(--gb-grid)] lg:px-40 lg:text-[2.7rem]">
           How Peak Electricity Use Affects Climate
         </h1>
 
@@ -241,13 +336,13 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="mx-auto mt-10 max-w-7xl px-6 lg:px-10">
+      <div class="mx-auto mt-10 max-w-7xl px-6 pb-14 lg:px-10 lg:pb-18">
         <!-- Story section: 3 rows (text + animation), middle row reversed -->
         <div class="space-y-6">
           <!-- Story row 1: text left, animation right -->
           <article class="grid items-center gap-8 md:grid-cols-2">
             <div>
-              <h3 class="mt-2 text-2xl font-bold lg:text-4xl">Peak-Time Appliance Usage Rises</h3>
+              <h3 class="mt-2 text-2xl font-bold text-[#1F4F4A] lg:text-4xl">Peak-Time Appliance Usage Rises</h3>
               <p class="mt-3 text-[20px]">
                 Households run appliances heavily during the hottest or coolest hours, especially in
                 thermally inefficient homes.
@@ -280,8 +375,50 @@ onBeforeUnmount(() => {
             </div>
           </article>
 
-          <!-- Story row 2: animation left, text right (reversed) -->
+          <!-- Story row 2: text left, animation right -->
+          <div class="relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] w-screen bg-white px-6 py-4">
+            <article class="mx-auto grid w-full max-w-7xl items-center gap-8 md:grid-cols-2 lg:px-10">
+              <div class="mx-auto h-[580px] w-full max-w-[620px]">
+                <DotLottieVue
+                  src="/lottie/home-story/temprising.lottie"
+                  autoplay
+                  loop
+                  style="width: 100%; height: 100%"
+                />
+              </div>
+              <div>
+                <h3 class="mt-2 text-2xl font-bold text-[#1F4F4A] lg:text-4xl">Climate Impacts Worsen</h3>
+                <p class="mt-3 text-[20px]">
+                  Rising emissions contribute to hotter conditions and more frequent extreme heat,
+                  creating a cycle that further increases cooling demand.
+                </p>
+                <RouterLink
+                  to="/awareness"
+                  class="mt-5 inline-flex items-center gap-1 text-base font-semibold text-blue-700 underline-offset-4 transition-colors hover:text-blue-800 hover:underline"
+                >
+                  -> View Chart Analysis
+                </RouterLink>
+              </div>
+            </article>
+          </div>
+
+          <!-- Story row 3: animation left, text right (reversed) -->
           <article class="grid items-center gap-8 md:grid-cols-2">
+            <div>
+              <h3 class="mt-2 text-2xl font-bold text-[#1F4F4A] lg:text-4xl">
+                Grid Stress and Emissions Increase
+              </h3>
+              <p class="mt-3 text-[20px]">
+                During peak windows, electricity demand pressures the grid and can increase carbon
+                intensity in the energy mix.
+              </p>
+              <RouterLink
+                to="/awareness"
+                class="mt-5 inline-flex items-center gap-1 text-base font-semibold text-blue-700 underline-offset-4 transition-colors hover:text-blue-800 hover:underline"
+              >
+                -> Explore Awareness Dashboard
+              </RouterLink>
+            </div>
             <div class="relative mx-auto h-[400px] w-full max-w-[450px]">
               <div class="absolute inset-0">
                 <DotLottieVue
@@ -300,105 +437,9 @@ onBeforeUnmount(() => {
                 />
               </div>
             </div>
-
-            <div>
-              <h3 class="mt-2 text-2xl font-bold lg:text-4xl">
-                Grid Stress and Emissions Increase
-              </h3>
-              <p class="mt-3 text-[20px]">
-                During peak windows, electricity demand pressures the grid and can increase carbon
-                intensity in the energy mix.
-              </p>
-              <RouterLink
-                to="/awareness"
-                class="mt-5 inline-flex items-center gap-1 text-base font-semibold text-blue-700 underline-offset-4 transition-colors hover:text-blue-800 hover:underline"
-              >
-                -> Explore Awareness Dashboard
-              </RouterLink>
-            </div>
-          </article>
-
-          <!-- Story row 3: text left, animation right -->
-          <article class="grid items-center gap-8 md:grid-cols-2">
-            <div>
-              <h3 class="mt-2 text-2xl font-bold lg:text-4xl">Climate Impacts Worsen</h3>
-              <p class="mt-3 text-[20px]">
-                Rising emissions contribute to hotter conditions and more frequent extreme heat,
-                creating a cycle that further increases cooling demand.
-              </p>
-              <RouterLink
-                to="/awareness"
-                class="mt-5 inline-flex items-center gap-1 text-base font-semibold text-blue-700 underline-offset-4 transition-colors hover:text-blue-800 hover:underline"
-              >
-                -> View Chart Analysis
-              </RouterLink>
-            </div>
-
-            <div class="mx-auto h-[500px] w-full max-w-[600px]">
-              <DotLottieVue
-                src="/lottie/home-story/temprising.lottie"
-                autoplay
-                loop
-                style="width: 100%; height: 100%"
-              />
-            </div>
           </article>
         </div>
 
-      </div>
-    </section>
-
-    <!-- Why section: one row, two columns -->
-    <section class="w-full py-6 reveal-on-scroll">
-      <div class="relative w-full bg-[var(--gb-grid)] min-h-[240px] flex items-center justify-center overflow-hidden mb-20">
-        <div class="pointer-events-none absolute left-0 top-1/2 z-10 h-[130px] w-[130px] -translate-y-1/2 lg:h-[450px] lg:w-[450px]">
-          <DotLottieVue
-            src="/lottie/decor/cherry-flowers.lottie"
-            :render-config="{ devicePixelRatio: 2, autoResize: true }"
-            autoplay
-            loop
-            style="width: 100%; height: 100%"
-          />
-        </div>
-
-        <h1 class="px-20 text-center text-3xl font-bold tracking-tight text-white lg:px-40 lg:text-5xl">
-          Why GreenBreeze Exists
-        </h1>
-
-        <div class="pointer-events-none absolute right-25 top-1/2 z-10 h-[130px] w-[130px] -translate-y-[60%] lg:h-[200px] lg:w-[200px]">
-          <DotLottieVue
-            src="/lottie/decor/bulb.lottie"
-            :render-config="{ devicePixelRatio: 2, autoResize: true }"
-            autoplay
-            loop
-            style="width: 100%; height: 100%"
-          />
-        </div>
-      </div>
-
-      <div class="mx-auto grid max-w-7xl items-center gap-10 px-6 lg:grid-cols-2 lg:px-10">
-        <!-- Why section: left image -->
-        <div class="overflow-hidden rounded-[10px] border border-slate-200 shadow-sm">
-          <img
-            src="/home-control.jpg"
-            alt="Smart home heating and cooling control interface"
-            class="h-full w-full object-cover"
-          />
-        </div>
-
-        <!-- Why section: right text -->
-        <div>
-          <h3 class="text-xl font-bold lg:text-3xl">
-            Avoid worst peak windows. Keep homes comfortable. Reduce climate impact.
-          </h3>
-          <p class="mt-4 text-[20px]">
-            GreenBreeze helps households make smarter heating and cooling choices during high-risk
-            periods, balancing indoor comfort with lower grid pressure and lower emissions.
-          </p>
-          <Button class="mt-6 bg-[var(--gb-electric)] px-7 hover:bg-[#4CBB17] hover:text-white" as-child>
-            <RouterLink to="/smart-actions">See Recommended Actions</RouterLink>
-          </Button>
-        </div>
       </div>
     </section>
 
@@ -406,7 +447,7 @@ onBeforeUnmount(() => {
     <section class="w-full mt-[6rem] reveal-on-scroll">
       <div class="relative overflow-hidden bg-white pb-20 pt-10 min-h-[760px] lg:pb-28 lg:pt-14 lg:min-h-[650px]">
         <div class="relative z-20 mx-auto max-w-7xl px-6 lg:px-10">
-          <h1 class="text-center text-3xl font-bold tracking-tight lg:text-5xl">How It Works</h1>
+          <h1 class="text-center text-3xl font-bold tracking-tight lg:text-[2.7rem]">How It Works</h1>
         </div>
 
         <svg
@@ -475,7 +516,7 @@ onBeforeUnmount(() => {
       "
     >
       <div class="mx-auto max-w-5xl px-6 text-center lg:px-10">
-        <h2 class="text-3xl font-bold tracking-tight text-white lg:text-5xl">
+        <h2 class="text-3xl font-bold tracking-tight text-white lg:text-[2.7rem]">
           Ready to Turn Daily Choices Into Climate Impact?
         </h2>
         <p class="mx-auto mt-4 max-w-3xl text-[20px] text-[#fef3c7]">
@@ -567,6 +608,10 @@ onBeforeUnmount(() => {
 }
 
 .reveal-on-scroll {
+  opacity: 1;
+}
+
+.reveal-on-scroll > * {
   opacity: 0;
   transform: translateY(20px);
   transition:
@@ -575,13 +620,13 @@ onBeforeUnmount(() => {
   will-change: opacity, transform;
 }
 
-.reveal-on-scroll.is-visible {
+.reveal-on-scroll.is-visible > * {
   opacity: 1;
   transform: translateY(0);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal-on-scroll {
+  .reveal-on-scroll > * {
     opacity: 1;
     transform: none;
     transition: none;

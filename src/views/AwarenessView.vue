@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { DotLottieVue } from '@lottiefiles/dotlottie-vue'
 import { Line } from 'vue-chartjs'
 import {
@@ -14,7 +14,7 @@ import {
   type ChartData,
   type ChartOptions,
 } from 'chart.js'
-import { RefreshCw, ThermometerSun, Zap } from 'lucide-vue-next'
+import { ThermometerSun, Zap } from 'lucide-vue-next'
 
 import SiteFooter from '@/components/layout/SiteFooter.vue'
 import SiteHeader from '@/components/layout/SiteHeader.vue'
@@ -33,11 +33,13 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip,
 
 type LiveMetric = 'total' | 'renewables' | 'intensity'
 type EmissionMetric = 'intensity' | 'emissions'
+type DemandMetric = 'energy' | 'temperature' | 'combined'
 
 const liveHours = ref<8 | 16 | 24>(24)
 const historicalDays = ref<14 | 30 | 60>(30)
 const liveMetric = ref<LiveMetric>('total')
 const emissionMetric = ref<EmissionMetric>('intensity')
+const demandMetric = ref<DemandMetric>('combined')
 
 const loading = ref(false)
 
@@ -362,41 +364,49 @@ const demandLabels = computed(() => demandSeries.value.map((point) => shortTimeL
 const demandChartData = computed<ChartData<'line'>>(() => ({
   labels: demandLabels.value,
   datasets: [
-    {
-      label: 'Energy (MWh)',
-      data: demandSeries.value.map((point) => point.energy_mwh),
-      borderColor: 'rgba(14, 116, 144, 1)',
-      borderWidth: 2.4,
-      tension: 0.24,
-      yAxisID: 'y',
-      fill: true,
-      pointRadius: demandSeries.value.map((point) => (point.is_demand_peak ? 5 : 2.5)),
-      pointHoverRadius: 6,
-      pointBorderWidth: 0,
-      pointBackgroundColor: demandSeries.value.map((point) =>
-        point.is_demand_peak ? 'rgba(239, 68, 68, 1)' : 'rgba(14, 116, 144, 1)',
-      ),
-      backgroundColor: (ctx) => {
-        const { chart } = ctx
-        const area = chart.chartArea
-        if (!area) return 'rgba(14, 165, 233, 0.14)'
-        const gradient = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom)
-        gradient.addColorStop(0, 'rgba(14, 165, 233, 0.33)')
-        gradient.addColorStop(1, 'rgba(14, 165, 233, 0.05)')
-        return gradient
-      },
-    },
-    {
-      label: 'Temperature (°C)',
-      data: demandSeries.value.map((point) => point.temperature_c),
-      borderColor: 'rgba(245, 158, 11, 0.95)',
-      borderWidth: 2,
-      borderDash: [6, 4],
-      tension: 0.22,
-      yAxisID: 'y1',
-      pointRadius: 0,
-      pointHoverRadius: 4,
-    },
+    ...(demandMetric.value === 'energy' || demandMetric.value === 'combined'
+      ? [
+          {
+            label: 'Energy (MWh)',
+            data: demandSeries.value.map((point) => point.energy_mwh),
+            borderColor: 'rgba(14, 116, 144, 1)',
+            borderWidth: 2.4,
+            tension: 0.24,
+            yAxisID: 'y',
+            fill: true,
+            pointRadius: demandSeries.value.map((point) => (point.is_demand_peak ? 5 : 2.5)),
+            pointHoverRadius: 6,
+            pointBorderWidth: 0,
+            pointBackgroundColor: demandSeries.value.map((point) =>
+              point.is_demand_peak ? 'rgba(239, 68, 68, 1)' : 'rgba(14, 116, 144, 1)',
+            ),
+            backgroundColor: (ctx: any) => {
+              const { chart } = ctx
+              const area = chart.chartArea
+              if (!area) return 'rgba(14, 165, 233, 0.14)'
+              const gradient = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom)
+              gradient.addColorStop(0, 'rgba(14, 165, 233, 0.33)')
+              gradient.addColorStop(1, 'rgba(14, 165, 233, 0.05)')
+              return gradient
+            },
+          },
+        ]
+      : []),
+    ...(demandMetric.value === 'temperature' || demandMetric.value === 'combined'
+      ? [
+          {
+            label: 'Temperature (°C)',
+            data: demandSeries.value.map((point) => point.temperature_c),
+            borderColor: 'rgba(245, 158, 11, 0.95)',
+            borderWidth: 2,
+            borderDash: [6, 4],
+            tension: 0.22,
+            yAxisID: 'y1',
+            pointRadius: 0,
+            pointHoverRadius: 4,
+          },
+        ]
+      : []),
   ],
 }))
 
@@ -439,6 +449,7 @@ const demandChartOptions = computed<ChartOptions<'line'>>(() => ({
       beginAtZero: false,
     },
     y1: {
+      display: demandMetric.value === 'temperature' || demandMetric.value === 'combined',
       position: 'right',
       title: { display: true, text: '°C' },
       ticks: { color: 'rgba(120,53,15,0.85)' },
@@ -522,6 +533,14 @@ const emissionsChartOptions = computed<ChartOptions<'line'>>(() => ({
 }))
 
 onMounted(async () => {
+  await loadAwarenessData()
+})
+
+watch(liveHours, async () => {
+  await loadAwarenessData()
+})
+
+watch(historicalDays, async () => {
   await loadAwarenessData()
 })
 </script>
@@ -639,33 +658,50 @@ onMounted(async () => {
         <CardHeader class="pb-2">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <CardTitle class="text-xl font-extrabold">{{ liveHours }}h Grid Series</CardTitle>
-            <div class="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
-              <button
-                type="button"
-                class="rounded-full px-3 py-1.5 text-xs font-bold transition"
-                :class="liveMetric === 'total' ? 'bg-sky-600 text-white' : 'text-slate-700 hover:bg-white'"
-                @click="liveMetric = 'total'"
-              >
-                Total MWh
-              </button>
-              <button
-                type="button"
-                class="rounded-full px-3 py-1.5 text-xs font-bold transition"
-                :class="liveMetric === 'renewables' ? 'bg-emerald-600 text-white' : 'text-slate-700 hover:bg-white'"
-                @click="liveMetric = 'renewables'"
-              >
-                Renewables %
-              </button>
-              <button
-                type="button"
-                class="rounded-full px-3 py-1.5 text-xs font-bold transition"
-                :class="liveMetric === 'intensity' ? 'bg-rose-600 text-white' : 'text-slate-700 hover:bg-white'"
-                @click="liveMetric = 'intensity'"
-              >
-                Intensity
-              </button>
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
+                <button
+                  v-for="option in [8, 16, 24]"
+                  :key="`live-hours-${option}`"
+                  type="button"
+                  class="rounded-full px-3 py-1.5 text-xs font-bold transition"
+                  :class="liveHours === option ? 'bg-[var(--gb-grid)] text-white' : 'text-slate-700 hover:bg-white'"
+                  @click="liveHours = option as 8 | 16 | 24"
+                >
+                  {{ option }}h
+                </button>
+              </div>
+              <div class="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
+                <button
+                  type="button"
+                  class="rounded-full px-3 py-1.5 text-xs font-bold transition"
+                  :class="liveMetric === 'total' ? 'bg-sky-600 text-white' : 'text-slate-700 hover:bg-white'"
+                  @click="liveMetric = 'total'"
+                >
+                  Total MWh
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full px-3 py-1.5 text-xs font-bold transition"
+                  :class="liveMetric === 'renewables' ? 'bg-emerald-600 text-white' : 'text-slate-700 hover:bg-white'"
+                  @click="liveMetric = 'renewables'"
+                >
+                  Renewables %
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full px-3 py-1.5 text-xs font-bold transition"
+                  :class="liveMetric === 'intensity' ? 'bg-rose-600 text-white' : 'text-slate-700 hover:bg-white'"
+                  @click="liveMetric = 'intensity'"
+                >
+                  Intensity
+                </button>
+              </div>
             </div>
           </div>
+          <p class="text-sm font-semibold text-slate-600">
+            Live snapshot: Victoria-wide grid mix and intensity over the last {{ liveHours }} hours (Australia/Melbourne time).
+          </p>
         </CardHeader>
         <CardContent>
           <div class="h-[340px]">
@@ -737,11 +773,54 @@ onMounted(async () => {
         <CardHeader>
           <div class="flex flex-wrap items-center justify-between gap-3">
             <CardTitle class="text-xl font-extrabold">Demand + Temperature Context</CardTitle>
-            <div class="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">
-              <ThermometerSun class="h-4 w-4" />
-              Avg Temp: {{ parseNumber(demandInsights?.avg_temperature_c, 1) }}°C
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
+                <button
+                  v-for="option in [14, 30, 60]"
+                  :key="`demand-days-${option}`"
+                  type="button"
+                  class="rounded-full px-3 py-1.5 text-xs font-bold transition"
+                  :class="historicalDays === option ? 'bg-[var(--gb-grid)] text-white' : 'text-slate-700 hover:bg-white'"
+                  @click="historicalDays = option as 14 | 30 | 60"
+                >
+                  {{ option }}d
+                </button>
+              </div>
+              <div class="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
+                <button
+                  type="button"
+                  class="rounded-full px-3 py-1.5 text-xs font-bold transition"
+                  :class="demandMetric === 'combined' ? 'bg-sky-600 text-white' : 'text-slate-700 hover:bg-white'"
+                  @click="demandMetric = 'combined'"
+                >
+                  Combined
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full px-3 py-1.5 text-xs font-bold transition"
+                  :class="demandMetric === 'energy' ? 'bg-cyan-700 text-white' : 'text-slate-700 hover:bg-white'"
+                  @click="demandMetric = 'energy'"
+                >
+                  Energy
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full px-3 py-1.5 text-xs font-bold transition"
+                  :class="demandMetric === 'temperature' ? 'bg-amber-600 text-white' : 'text-slate-700 hover:bg-white'"
+                  @click="demandMetric = 'temperature'"
+                >
+                  Temperature
+                </button>
+              </div>
+              <div class="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">
+                <ThermometerSun class="h-4 w-4" />
+                Avg Temp: {{ parseNumber(demandInsights?.avg_temperature_c, 1) }}°C
+              </div>
             </div>
           </div>
+          <p class="text-sm font-semibold text-slate-600">
+            Historical dataset: Victoria-wide demand trends over the last {{ historicalDays }} days (Australia/Melbourne time).
+          </p>
         </CardHeader>
         <CardContent>
           <div class="h-[360px]">
@@ -812,25 +891,42 @@ onMounted(async () => {
           <CardHeader class="pb-2">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <CardTitle class="text-xl font-extrabold">Emission Trend</CardTitle>
-              <div class="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
-                <button
-                  type="button"
-                  class="rounded-full px-3 py-1.5 text-xs font-bold transition"
-                  :class="emissionMetric === 'intensity' ? 'bg-emerald-600 text-white' : 'text-slate-700 hover:bg-white'"
-                  @click="emissionMetric = 'intensity'"
-                >
-                  Intensity
-                </button>
-                <button
-                  type="button"
-                  class="rounded-full px-3 py-1.5 text-xs font-bold transition"
-                  :class="emissionMetric === 'emissions' ? 'bg-rose-600 text-white' : 'text-slate-700 hover:bg-white'"
-                  @click="emissionMetric = 'emissions'"
-                >
-                  Emissions (t)
-                </button>
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
+                  <button
+                    v-for="option in [14, 30, 60]"
+                    :key="`emission-days-${option}`"
+                    type="button"
+                    class="rounded-full px-3 py-1.5 text-xs font-bold transition"
+                    :class="historicalDays === option ? 'bg-[var(--gb-grid)] text-white' : 'text-slate-700 hover:bg-white'"
+                    @click="historicalDays = option as 14 | 30 | 60"
+                  >
+                    {{ option }}d
+                  </button>
+                </div>
+                <div class="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
+                  <button
+                    type="button"
+                    class="rounded-full px-3 py-1.5 text-xs font-bold transition"
+                    :class="emissionMetric === 'intensity' ? 'bg-emerald-600 text-white' : 'text-slate-700 hover:bg-white'"
+                    @click="emissionMetric = 'intensity'"
+                  >
+                    Intensity
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-full px-3 py-1.5 text-xs font-bold transition"
+                    :class="emissionMetric === 'emissions' ? 'bg-rose-600 text-white' : 'text-slate-700 hover:bg-white'"
+                    @click="emissionMetric = 'emissions'"
+                  >
+                    Emissions (t)
+                  </button>
+                </div>
               </div>
             </div>
+            <p class="text-sm font-semibold text-slate-600">
+              Historical dataset: Victoria-wide emissions trends over the last {{ historicalDays }} days (Australia/Melbourne time).
+            </p>
           </CardHeader>
           <CardContent>
             <div class="h-[360px]">
@@ -862,62 +958,6 @@ onMounted(async () => {
       </div>
     </section>
   </main>
-
-  <div class="awareness-floating-controls">
-    <div class="awareness-floating-inner">
-      <div>
-        <p class="text-[11px] font-bold uppercase tracking-wide text-slate-600">Live Grid Window</p>
-        <div class="mt-1 inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
-          <button
-            v-for="option in [8, 16, 24]"
-            :key="`float-live-${option}`"
-            type="button"
-            class="rounded-full px-3 py-1.5 text-xs font-bold transition sm:px-4 sm:text-sm"
-            :class="
-              liveHours === option
-                ? 'bg-[var(--gb-grid)] text-white'
-                : 'text-slate-700 hover:bg-white hover:text-slate-900'
-            "
-            @click="liveHours = option as 8 | 16 | 24"
-          >
-            {{ option }}h
-          </button>
-        </div>
-      </div>
-
-      <div class="hidden sm:block">
-        <p class="text-[11px] font-bold uppercase tracking-wide text-slate-600">Historical Window</p>
-        <div class="mt-1 inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
-          <button
-            v-for="option in [14, 30, 60]"
-            :key="`float-days-${option}`"
-            type="button"
-            class="rounded-full px-3 py-1.5 text-xs font-bold transition sm:px-4 sm:text-sm"
-            :class="
-              historicalDays === option
-                ? 'bg-[var(--gb-grid)] text-white'
-                : 'text-slate-700 hover:bg-white hover:text-slate-900'
-            "
-            @click="historicalDays = option as 14 | 30 | 60"
-          >
-            {{ option }}d
-          </button>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-2">
-        <Button
-          type="button"
-          class="h-9 bg-[var(--gb-electric)] px-4 text-xs text-white hover:bg-[#4CBB17] hover:text-white sm:h-10 sm:px-6 sm:text-sm"
-          :disabled="loading"
-          @click="loadAwarenessData"
-        >
-          <RefreshCw class="mr-2 h-4 w-4" :class="loading ? 'animate-spin' : ''" />
-          {{ loading ? 'Refreshing…' : 'Refresh' }}
-        </Button>
-      </div>
-    </div>
-  </div>
 
   <SiteFooter />
 </template>
@@ -969,34 +1009,4 @@ onMounted(async () => {
   color: #0f172a;
 }
 
-.awareness-floating-controls {
-  position: fixed;
-  left: 50%;
-  bottom: 14px;
-  z-index: 70;
-  width: min(860px, calc(100vw - 20px));
-  transform: translateX(-50%);
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(10px);
-  box-shadow:
-    0 18px 40px rgba(15, 23, 42, 0.16),
-    0 1px 0 rgba(255, 255, 255, 0.9) inset;
-  padding: 10px 12px 8px;
-}
-
-.awareness-floating-inner {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-@media (max-width: 900px) {
-  .awareness-floating-inner {
-    align-items: center;
-    flex-wrap: wrap;
-  }
-}
 </style>

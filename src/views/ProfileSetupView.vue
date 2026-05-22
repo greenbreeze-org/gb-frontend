@@ -27,6 +27,7 @@ const selectedDevices = ref<string[]>([])
 const submitLoading = ref(false)
 const submitError = ref('')
 const forcePostcodeInput = ref(false)
+const isDetachedHomeConfirmed = ref(false)
 
 const locationStatus = ref<'checking' | 'granted' | 'denied' | 'unavailable'>('checking')
 const locationCoords = ref<{ lat: number; lon: number } | null>(null)
@@ -76,7 +77,11 @@ const isLocationValid = computed(() => {
 const isHouseMaterialValid = computed(() => Boolean(houseMaterial.value))
 const isDeviceSelectionValid = computed(() => selectedDevices.value.length > 0)
 const setupReady = computed(
-  () => isLocationValid.value && isHouseMaterialValid.value && isDeviceSelectionValid.value,
+  () =>
+    isDetachedHomeConfirmed.value &&
+    isLocationValid.value &&
+    isHouseMaterialValid.value &&
+    isDeviceSelectionValid.value,
 )
 
 const locationError = computed(() =>
@@ -315,7 +320,7 @@ onMounted(async () => {
       <section class="profile-shell mx-auto max-w-6xl overflow-hidden rounded-2xl border border-slate-200">
         <div class="profile-hero grid gap-0 md:grid-cols-[1fr_1.35fr]">
           <div class="profile-hero-media relative min-h-[220px]">
-            <img src="/home-profile-card.jpg" alt="Home profile setup" class="h-full w-full object-contain" />
+            <img src="/house.png" alt="Home profile setup" class="h-full w-full object-contain" />
           </div>
           <div class="profile-hero-copy p-8 lg:p-10">
             <p class="profile-chip">GreenBreeze Onboarding</p>
@@ -327,102 +332,128 @@ onMounted(async () => {
         </div>
 
         <div class="mx-auto max-w-5xl p-8 pt-6 lg:p-10 lg:pt-8">
-          <div class="mb-8 flex flex-wrap items-center justify-center gap-3">
-            <span
-              v-if="locationStatus === 'granted'"
-              class="rounded-full bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white"
-            >
-              Location Granted
-            </span>
-            <span
-              v-else-if="locationStatus === 'denied' || locationStatus === 'unavailable'"
-              class="rounded-full bg-red-600 px-4 py-1.5 text-sm font-semibold text-white"
-            >
-              Location Denied
-            </span>
-            <span
-              v-else
-              class="rounded-full bg-slate-600 px-4 py-1.5 text-sm font-semibold text-white"
-            >
-              Checking Location...
-            </span>
+          <div class="mb-8 rounded-xl border border-[var(--gb-grid)]/30 bg-[#EAF7EE] p-5">
+            <p class="text-lg font-semibold text-[var(--gb-grid)] lg:text-xl">
+              Current recommendation support:
+              <span class="font-extrabold text-red-700">freestanding single-family houses</span>.
+            </p>
+            <div class="mt-3 flex items-start gap-3">
+              <Checkbox
+                id="detached-home-confirmation"
+                :model-value="isDetachedHomeConfirmed"
+                @update:model-value="(checked) => (isDetachedHomeConfirmed = Boolean(checked))"
+              />
+              <Label for="detached-home-confirmation" class="text-base leading-relaxed">
+                My home is a freestanding single-family house, and I want to continue with this setup.
+              </Label>
+            </div>
           </div>
 
-          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div class="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <Label for="house-material" class="text-base font-semibold"
-                >House Material (Detached House)</Label
+          <fieldset v-if="isDetachedHomeConfirmed">
+            <div class="mb-8 flex flex-wrap items-center justify-center gap-3">
+              <span
+                v-if="locationStatus === 'granted'"
+                class="rounded-full bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white"
               >
-              <select
-                id="house-material"
-                v-model="houseMaterial"
-                class="border-input focus-visible:ring-ring/50 h-11 w-full rounded-md border bg-white px-4 text-base outline-none focus-visible:ring-[3px]"
+                Location Granted
+              </span>
+              <span
+                v-else-if="locationStatus === 'denied' || locationStatus === 'unavailable'"
+                class="rounded-full bg-red-600 px-4 py-1.5 text-sm font-semibold text-white"
               >
-                <option value="">Select house material</option>
-                <option
-                  v-for="option in houseMaterialOptions"
-                  :key="option.value"
-                  :value="option.value"
+                Location Denied
+              </span>
+              <span
+                v-else
+                class="rounded-full bg-slate-600 px-4 py-1.5 text-sm font-semibold text-white"
+              >
+                Checking Location...
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div class="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <Label for="house-material" class="text-base font-semibold"
+                  >House Material (Freestanding House)</Label
                 >
-                  {{ option.label }}
-                </option>
-              </select>
-              <p v-if="houseMaterialError" class="text-sm text-red-600">{{ houseMaterialError }}</p>
+                <select
+                  id="house-material"
+                  v-model="houseMaterial"
+                  class="border-input focus-visible:ring-ring/50 h-11 w-full rounded-md border bg-white px-4 text-base outline-none focus-visible:ring-[3px]"
+                >
+                  <option value="">Select house material</option>
+                  <option
+                    v-for="option in houseMaterialOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+                <p v-if="houseMaterialError" class="text-sm text-red-600">{{ houseMaterialError }}</p>
+              </div>
+
+              <div
+                v-if="locationStatus === 'denied' || locationStatus === 'unavailable' || forcePostcodeInput"
+                class="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4"
+              >
+                <Label for="postcode" class="text-base font-semibold"
+                  >Postcode (VIC only)</Label
+                >
+                <Input id="postcode" v-model="postcode" placeholder="e.g. 3000" class="h-11 text-base" />
+                <p v-if="locationError" class="text-sm text-red-600">{{ locationError }}</p>
+              </div>
+            </div>
+
+            <div class="mt-6 space-y-3">
+              <Label class="text-base font-semibold">Available Heating/Cooling Devices</Label>
+              <div class="grid gap-3 md:grid-cols-2">
+                <div
+                  v-for="device in deviceOptions"
+                  :key="device.value"
+                  class="flex items-center gap-3 rounded-md py-1"
+                >
+                  <Checkbox
+                    :id="device.value"
+                    :model-value="selectedDevices.includes(device.value)"
+                    @update:model-value="(checked) => toggleDevice(device.value, Boolean(checked))"
+                  />
+                  <Label :for="device.value" class="text-base">{{ device.label }}</Label>
+                </div>
+              </div>
+              <p v-if="devicesError" class="text-sm text-red-600">{{ devicesError }}</p>
             </div>
 
             <div
-              v-if="locationStatus === 'denied' || locationStatus === 'unavailable' || forcePostcodeInput"
-              class="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4"
+              v-if="setupReady"
+              class="mt-6 mx-auto max-w-100 rounded-xl text-center bg-emerald-50 border border-emerald-800 px-4 py-3 text-sm text-emerald-800"
             >
-              <Label for="postcode" class="text-base font-semibold"
-                >Postcode (VIC only)</Label
-              >
-              <Input id="postcode" v-model="postcode" placeholder="e.g. 3000" class="h-11 text-base" />
-              <p v-if="locationError" class="text-sm text-red-600">{{ locationError }}</p>
+              Profile setup is validated.
             </div>
-          </div>
 
-          <div class="mt-6 space-y-3">
-            <Label class="text-base font-semibold">Available Heating/Cooling Devices</Label>
-            <div class="grid gap-3 md:grid-cols-2">
-              <div
-                v-for="device in deviceOptions"
-                :key="device.value"
-                class="flex items-center gap-3 rounded-md py-1"
-              >
-                <Checkbox
-                  :id="device.value"
-                  :model-value="selectedDevices.includes(device.value)"
-                  @update:model-value="(checked) => toggleDevice(device.value, Boolean(checked))"
-                />
-                <Label :for="device.value" class="text-base">{{ device.label }}</Label>
-              </div>
+            <div v-else class="mt-6 mx-auto max-w-600 text-center border border-amber-800 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Please complete all Home Profile Setup fields to unlock full Smart Actions insights.
             </div>
-            <p v-if="devicesError" class="text-sm text-red-600">{{ devicesError }}</p>
-          </div>
+
+            <div class="mt-6 flex items-center justify-center">
+              <Button
+                type="button"
+                class="h-11 bg-[var(--gb-electric)] px-8 text-white hover:bg-[#4CBB17] hover:text-white"
+                :disabled="!setupReady || submitLoading"
+                @click="submitProfile"
+              >
+                {{ submitLoading ? 'Submitting...' : 'Submit Home Profile Setup' }}
+              </Button>
+            </div>
+            <p v-if="submitError" class="mt-3 text-center text-sm font-semibold text-red-600">{{ submitError }}</p>
+          </fieldset>
 
           <div
-            v-if="setupReady"
-            class="mt-6 mx-auto max-w-100 rounded-xl text-center bg-emerald-50 border border-emerald-800 px-4 py-3 text-sm text-emerald-800"
+            v-if="!isDetachedHomeConfirmed"
+            class="mt-6 mx-auto max-w-600 text-center border border-amber-800 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800"
           >
-            Profile setup is validated.
+            Please verify your dwelling type to continue with Home Profile Setup.
           </div>
-
-          <div v-else class="mt-6 mx-auto max-w-600 text-center border border-amber-800 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Please complete all Home Profile Setup fields to unlock full Smart Actions insights.
-          </div>
-
-          <div class="mt-6 flex items-center justify-center">
-            <Button
-              type="button"
-              class="h-11 bg-[var(--gb-electric)] px-8 text-white hover:bg-[#4CBB17] hover:text-white"
-              :disabled="!setupReady || submitLoading"
-              @click="submitProfile"
-            >
-              {{ submitLoading ? 'Submitting...' : 'Submit Home Profile Setup' }}
-            </Button>
-          </div>
-          <p v-if="submitError" class="mt-3 text-center text-sm font-semibold text-red-600">{{ submitError }}</p>
         </div>
       </section>
     </main>
