@@ -1472,11 +1472,16 @@ watch(
   },
 )
 
+watch(showSetupGateModal, (open) => {
+  document.body.style.overflow = open ? 'hidden' : ''
+})
+
 onBeforeUnmount(() => {
   if (impactAnimationFrame) cancelAnimationFrame(impactAnimationFrame)
   clearImpactPreludeTimers()
   revealObserver?.disconnect()
   revealObserver = null
+  document.body.style.overflow = ''
 })
 </script>
 
