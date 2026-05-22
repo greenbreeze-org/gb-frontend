@@ -59,6 +59,7 @@ const locationCoords = ref<{ lat: number; lon: number } | null>(null)
 const activeFallbackPostcode = ref('3000')
 const forecastSnapshot = ref<ForecastSnapshot | null>(null)
 const heroLoading = ref(true)
+const showSetupGateModal = ref(false)
 const chartHourlyFromApi = ref<Array<{ time: string; tempC: number }>>([])
 const awsTodayMinMax = ref<{ minC: number; maxC: number } | null>(null)
 const HEATWAVE_THRESHOLD_C = 35
@@ -1011,6 +1012,10 @@ const loadForecastBlocks = async () => {
 }
 
 const scrollToActionFlow = () => {
+  if (!isUnlocked.value) {
+    showSetupGateModal.value = true
+    return
+  }
   const targetId = !isUnlocked.value ? 'setup-gate-card' : 'recommendations-banner'
   const section = document.getElementById(targetId)
   if (section) {
@@ -1394,6 +1399,15 @@ const loadRecommendations = async () => {
 }
 
 onMounted(async () => {
+  if (!isUnlocked.value) {
+    heroLoading.value = false
+    showSetupGateModal.value = true
+    await nextTick()
+    setupRevealObserver()
+    refreshRevealTargets()
+    return
+  }
+
   const heroFlow = (async () => {
     await checkBrowserLocationPermission()
     await loadForecastBlocks()
@@ -1483,6 +1497,52 @@ onBeforeUnmount(() => {
     </Transition>
 
     <SiteHeader />
+
+    <Transition name="page-overlay-fade">
+      <div
+        v-if="showSetupGateModal && !isUnlocked"
+        class="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/65 px-4"
+        @click.self="showSetupGateModal = false"
+      >
+        <Card class="setup-modern-card w-full max-w-4xl overflow-hidden text-left shadow-2xl">
+          <div class="grid items-stretch gap-0 md:grid-cols-[1.05fr_1.35fr]">
+            <div class="setup-media-wrap relative h-full min-h-[220px]">
+              <img
+                src="/house.png"
+                alt="Home profile setup illustration"
+                class="h-full w-full object-cover"
+              />
+              <div class="setup-media-glow" aria-hidden="true"></div>
+            </div>
+
+            <div class="setup-content relative p-6 md:p-8">
+              <button
+                type="button"
+                class="absolute right-4 top-4 rounded-full border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                @click="showSetupGateModal = false"
+              >
+                Close
+              </button>
+              <span class="setup-chip">Step 1 to Unlock Smart Actions</span>
+              <CardTitle class="mt-3 text-3xl font-extrabold leading-tight text-[var(--gb-grid)]">
+                Complete Home Profile Setup
+              </CardTitle>
+              <p class="mt-3 text-base font-medium text-slate-700">
+                Add your home details once so GreenBreeze can generate smarter, personalized recommendations.
+              </p>
+              <div class="mt-5 flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-700">
+                <span class="setup-pill">Personalized actions</span>
+                <span class="setup-pill">Faster insights</span>
+                <span class="setup-pill">Higher accuracy</span>
+              </div>
+              <Button as-child class="mt-6 bg-[var(--gb-electric)] px-7 text-white hover:bg-[#4CBB17] hover:text-white">
+                <RouterLink to="/profile-setup">Set Up My Home Profile</RouterLink>
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </Transition>
 
     <section class="reveal-on-scroll w-full pb-12">
       <Transition name="hero-fade">
@@ -1625,11 +1685,20 @@ onBeforeUnmount(() => {
                 Every action you choose today helps reduce pressure on the grid and climate impact tomorrow.
               </p>
               <Button
+                v-if="isUnlocked"
                 size="lg"
                 class="mt-6 bg-[var(--gb-electric)] px-8 text-white hover:bg-[#4CBB17] hover:text-white"
                 @click="scrollToActionFlow"
               >
                 Act Now
+              </Button>
+              <Button
+                v-else
+                size="lg"
+                class="mt-6 bg-[var(--gb-electric)] px-8 text-white hover:bg-[#4CBB17] hover:text-white"
+                as-child
+              >
+                <RouterLink to="/profile-setup">Set Up My Home Profile</RouterLink>
               </Button>
             </div>
 
@@ -1659,11 +1728,20 @@ onBeforeUnmount(() => {
               Weather context is temporarily unavailable. You can still continue with Smart Actions.
             </p>
             <Button
+              v-if="isUnlocked"
               size="lg"
               class="mt-6 bg-[var(--gb-electric)] px-8 text-white hover:bg-[#4CBB17] hover:text-white"
               @click="scrollToActionFlow"
             >
               Act Now
+            </Button>
+            <Button
+              v-else
+              size="lg"
+              class="mt-6 bg-[var(--gb-electric)] px-8 text-white hover:bg-[#4CBB17] hover:text-white"
+              as-child
+            >
+              <RouterLink to="/profile-setup">Set Up My Home Profile</RouterLink>
             </Button>
           </div>
         </div>
@@ -1671,42 +1749,7 @@ onBeforeUnmount(() => {
     </section>
 
     <main id="smart-actions-flow" class="mx-auto flex w-full max-w-5xl flex-col items-center px-6 py-10 text-center lg:px-10">
-      <Card
-        v-if="!isUnlocked"
-        id="setup-gate-card"
-        class="setup-modern-card mt-10 w-full max-w-4xl overflow-hidden text-left"
-      >
-        <div class="grid items-stretch gap-0 md:grid-cols-[1.05fr_1.35fr]">
-          <div class="setup-media-wrap relative h-full min-h-[220px]">
-            <img
-              src="/home-profile-card.jpg"
-              alt="Home profile setup illustration"
-              class="h-full w-full object-cover"
-            />
-            <div class="setup-media-glow" aria-hidden="true"></div>
-          </div>
-
-          <div class="setup-content p-6 md:p-8">
-            <span class="setup-chip">Step 1 to Unlock Smart Actions</span>
-            <CardTitle class="mt-3 text-3xl font-extrabold leading-tight text-[var(--gb-grid)]">
-              Complete Home Profile Setup
-            </CardTitle>
-            <p class="mt-3 text-base font-medium text-slate-700">
-              Add your home details once so GreenBreeze can generate smarter, personalized recommendations.
-            </p>
-            <div class="mt-5 flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-700">
-              <span class="setup-pill">Personalized actions</span>
-              <span class="setup-pill">Faster insights</span>
-              <span class="setup-pill">Higher accuracy</span>
-            </div>
-            <Button as-child class="mt-6 bg-[var(--gb-electric)] px-7 text-white hover:bg-[#4CBB17] hover:text-white">
-              <RouterLink to="/profile-setup">Set Up My Home Profile</RouterLink>
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      <template v-else>
+      <template v-if="isUnlocked">
         <p v-if="loading" class="mt-6 text-sm font-semibold text-slate-600">Loading smart actions...</p>
         <p v-if="errorMessage" class="mt-6 text-sm font-semibold text-red-600">{{ errorMessage }}</p>
 
